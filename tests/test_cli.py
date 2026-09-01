@@ -31,3 +31,21 @@ def test_main_help_lists_parse_command() -> None:
 
     assert result.exit_code == 0
     assert "parse" in result.output
+    assert "latex" in result.output
+
+
+def test_latex_command_writes_fragment(tmp_path: Path) -> None:
+    """The latex command renders source prologues directly."""
+    runner = CliRunner()
+    source = tmp_path / "source.f"
+    source.write_text(
+        "*+\n*  Name:\n*     DEMO\n*  Purpose:\n*     Test output.\n"
+        "*  Invocation:\n*     CALL DEMO\n*  Description:\n*     Exercise CLI.\n*-\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(main, ["latex", str(source)])
+
+    assert result.exit_code == 0, result.output
+    assert result.output.startswith("\\sstroutine{")
+    assert "\\sstinvocation{" in result.output

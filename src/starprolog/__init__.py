@@ -5,6 +5,8 @@ __all__ = (
     "DiagnosticSeverity",
     "InputLanguage",
     "ItemListBlock",
+    "LatexMode",
+    "LatexOptions",
     "LineBlock",
     "ListItem",
     "ParagraphBlock",
@@ -15,10 +17,14 @@ __all__ = (
     "Section",
     "SectionRole",
     "SourceSpan",
+    "escape_latex",
     "parse_paths",
     "parse_text",
+    "render_latex",
+    "render_prologue_latex",
 )
 
+from .latex import LatexMode, LatexOptions, escape_latex, render_latex, render_prologue_latex
 from .models import (
     Diagnostic,
     DiagnosticSeverity,

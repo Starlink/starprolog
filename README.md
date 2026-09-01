@@ -2,17 +2,16 @@
 
 `starprolog` parses Starlink-style source-code prologues into a
 renderer-independent document tree. The command-line interface will provide
-LaTeX and Starlink help-library renderers; the first implementation milestone
-provides JSON output for inspecting and testing the intermediate
-representation.
+LaTeX and Starlink help-library renderers. The intermediate representation
+can also be written as JSON for inspection and use by other tools.
 
 The implementation is independent of the legacy Starlink SST implementation
 and does not require a Starlink software installation.
 
 ## Development status
 
-The public interface is under active development. The currently available
-command parses one or more source files:
+The public interface is under active development. Parse one or more source
+files into the JSON intermediate representation with:
 
 ```sh
 starprolog parse source.f source.c -o prologues.json
@@ -20,6 +19,17 @@ starprolog parse source.f source.c -o prologues.json
 
 Use `--language c` or `--language fortran` to select language-specific lines
 in AST-style public prologues. By default, both variants are retained.
+
+Render a fragment using the traditional Starlink SST LaTeX macros with:
+
+```sh
+starprolog latex source.f source.c -o routines.tex
+```
+
+Use `--document` to include portable definitions of the SST macros and emit a
+complete LaTeX document. `--mode auto` distinguishes ADAM A-tasks from library
+routines using each prologue's `Type of Module` section; it can be overridden
+with `--mode atask` or `--mode library`.
 
 ## Development
 
