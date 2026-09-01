@@ -1,0 +1,145 @@
+[build-system]
+requires = ["setuptools >= 77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "starprolog"
+version = "0.1.0"
+description = "Parse and render Starlink-style source-code prologues"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "BSD-3-Clause"
+license-files = ["COPYRIGHT", "LICENSE"]
+authors = [
+    {name = "Association of Universities for Research in Astronomy"},
+]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Documentation",
+    "Topic :: Software Development :: Documentation",
+]
+dependencies = [
+    "click >= 8",
+    "pydantic >= 2.12",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest >= 7.4",
+]
+
+[dependency-groups]
+dev = [
+    "mypy >= 1.14",
+    "numpydoc >= 1.8",
+    "pre-commit >= 4",
+    "pytest >= 7.4",
+    "ruff >= 0.14",
+]
+
+[project.scripts]
+starprolog = "starprolog.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+starprolog = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.",
+    "if TYPE_CHECKING:",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",       # pycodestyle errors
+    "F",       # pyflakes
+    "N",       # pep8-naming
+    "W",       # pycodestyle warnings
+    "D",       # pydocstyle
+    "I",       # isort
+    "C4",      # comprehensions
+    "UP",      # pyupgrade
+    "PT",      # pytest style
+    "RUF022",  # sorted __all__
+]
+extend-select = ["RUF100"]
+ignore = [
+    "D100",
+    "D102",
+    "D104",
+    "D105",
+    "D107",
+    "D200",
+    "D205",
+    "D400",
+]
+
+[tool.ruff.lint.pycodestyle]
+max-doc-length = 79
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = 79
+
+[tool.pydocstyle]
+convention = "numpy"
+add-ignore = ["D100", "D102", "D104", "D105", "D107", "D200", "D205", "D400"]
+
+[tool.numpydoc_validation]
+checks = [
+    "all",
+    "SA01",
+    "EX01",
+    "SS06",
+    "GL01",
+    "GL08",
+    "ES01",
+    "RT01",
+    "RT02",
+    "SS05",
+    "GL03",
+    "PR04",
+    "SA04",
+]
+exclude = [
+    "^test_.*",
+    "^__init__$",
+    "\\._[a-zA-Z_]+$",
+    "^cli\\.",
+]
+
+[tool.mypy]
+warn_unused_configs = true
+warn_redundant_casts = true
+plugins = "pydantic.mypy"
+
+[[tool.mypy.overrides]]
+module = ["starprolog.*"]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+strict_equality = true
+warn_unreachable = true
+warn_unused_ignores = true
