@@ -60,6 +60,7 @@ class SectionRole(StrEnum):
     """Canonical semantic role assigned to a known section heading."""
 
     ADAM_PARAMETERS = "adam_parameters"
+    ALGORITHM = "algorithm"
     APPLICABILITY = "applicability"
     ARGUMENTS = "arguments"
     AUTHORS = "authors"
@@ -69,6 +70,7 @@ class SectionRole(StrEnum):
     EXAMPLES = "examples"
     HISTORY = "history"
     IMPLEMENTATION_STATUS = "implementation_status"
+    IMPLEMENTATION_DEFICIENCIES = "implementation_deficiencies"
     INVOCATION = "invocation"
     LANGUAGE = "language"
     LICENCE = "licence"

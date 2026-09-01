@@ -31,6 +31,10 @@ def test_render_library_routine() -> None:
 *     - Second note.
 *  Bugs:
 *     {note_any_bugs_here}
+*  Algorithm:
+*     Internal implementation detail.
+*  Implementation Deficiencies:
+*     Another internal implementation detail.
 *-
 """
     )
@@ -46,6 +50,7 @@ def test_render_library_routine() -> None:
     assert "\\sstitemlist{" in result
     assert "\\sstusage{" not in result
     assert "\\sstbugs{" not in result
+    assert "Internal implementation detail" not in result
 
 
 def test_auto_mode_detects_atask_and_complete_document() -> None:

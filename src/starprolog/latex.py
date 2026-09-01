@@ -79,6 +79,7 @@ _DOCUMENT_PREAMBLE = r"""\documentclass[11pt]{article}
 _DOCUMENT_END = "\\end{document}\n"
 
 _EXCLUDED_ROLES = {
+    SectionRole.ALGORITHM,
     SectionRole.NAME,
     SectionRole.PURPOSE,
     SectionRole.LANGUAGE,
@@ -86,6 +87,7 @@ _EXCLUDED_ROLES = {
     SectionRole.SYNOPSIS,
     SectionRole.AUTHORS,
     SectionRole.HISTORY,
+    SectionRole.IMPLEMENTATION_DEFICIENCIES,
     SectionRole.LICENCE,
     SectionRole.COPYRIGHT,
 }

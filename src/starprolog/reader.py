@@ -43,6 +43,7 @@ _PLACEHOLDERS = (
 
 _SECTION_ROLES = {
     "adam parameters": SectionRole.ADAM_PARAMETERS,
+    "algorithm": SectionRole.ALGORITHM,
     "applicability": SectionRole.APPLICABILITY,
     "arguments": SectionRole.ARGUMENTS,
     "authors": SectionRole.AUTHORS,
@@ -52,6 +53,7 @@ _SECTION_ROLES = {
     "examples": SectionRole.EXAMPLES,
     "history": SectionRole.HISTORY,
     "implementation status": SectionRole.IMPLEMENTATION_STATUS,
+    "implementation deficiencies": SectionRole.IMPLEMENTATION_DEFICIENCIES,
     "invocation": SectionRole.INVOCATION,
     "language": SectionRole.LANGUAGE,
     "licence": SectionRole.LICENCE,
