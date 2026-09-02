@@ -283,3 +283,28 @@ def test_header_shallower_than_the_first_keeps_earlier_sections() -> None:
         "Purpose",
         "Odd",
     ]
+
+
+def test_spelling_variants_share_a_section_role() -> None:
+    """American and British spellings reach the same role, unlike in SST."""
+    collection = parse_text(
+        "*+\n"
+        "*  Name:\n"
+        "*     VARIANT\n"
+        "*  Purpose:\n"
+        "*     Accept both spellings.\n"
+        "*  Return Value:\n"
+        "*     VARIANT = INTEGER\n"
+        "*        The returned value.\n"
+        "*  License:\n"
+        "*     Boilerplate.\n"
+        "*-\n"
+    )
+
+    assert [section.role for section in collection.prologues[0].sections[2:]] == [
+        SectionRole.RETURNED_VALUE,
+        SectionRole.LICENCE,
+    ]
+    latex = render_latex(collection)
+    assert "\\sstreturnedvalue{" in latex
+    assert "Boilerplate." not in latex

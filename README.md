@@ -124,11 +124,16 @@ line indented inside a C block comment is discarded.
 `starprolog` accepts the indented form, which is also what makes prologues
 inside indented C comments and Python docstrings readable.
 
-### Additional section headings are recognized
+### Spelling variants of section headings are accepted
 
-`Return Value` and `License` are treated as `Returned Value` and `Licence`.
-The original tools match those headings exactly, so they render `Return Value`
-as an ordinary topic and repeat the licence text in the output.
+`Return Value` is treated as `Returned Value`, and `License` as `Licence`.
+The original tools match section headings exactly, so they render
+`Return Value` as an ordinary topic rather than a returned value, and repeat
+the licence boilerplate that `Licence` suppresses.
+The intent of either spelling is unambiguous, so `starprolog` honours both.
+Headings that merely resemble a known one are left alone: `Author` stays an
+ordinary topic, because folding it into `Authors` would drop it from the
+output rather than place it better.
 
 ### A prologue is never emitted twice
 
