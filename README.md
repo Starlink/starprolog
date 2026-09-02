@@ -1,5 +1,7 @@
 # starprolog
 
+[![CI](https://github.com/Starlink/starprolog/actions/workflows/ci.yaml/badge.svg)](https://github.com/Starlink/starprolog/actions/workflows/ci.yaml)
+
 `starprolog` parses Starlink-style source-code prologues into a
 renderer-independent document tree. The command-line interface provides
 LaTeX and Starlink help-library renderers. The intermediate representation
