@@ -24,6 +24,7 @@ _FORTRAN_MODULE_RE = re.compile(
     re.IGNORECASE,
 )
 _FORTRAN_END_RE = re.compile(r"^\s*[*Cc#]-.*$")
+_COMMENT_CHARACTERS = frozenset("*Cc#")
 
 _C_START_RE = re.compile(
     r"^\s*/\*[+=]\s*(?P<name>[A-Za-z_][A-Za-z0-9_]*)"
@@ -38,7 +39,47 @@ _TITLE_ALIASES = {
     "deficiencies": "Implementation Deficiencies",
     "method": "Algorithm",
     "parameters": "Arguments",
+    "result": "Returned Value",
 }
+
+_ADAM_PLACEHOLDERS = (
+    "<name of task>",
+    "<brief title for subroutine>",
+    "<brief title for function>",
+    "<description of what the task does>",
+    "<description of what the subroutine does>",
+    "<description of what the function does>",
+    "Invoked by the a-task environment",
+    "CALL name[(argument_list)]",
+    "result = name[(argument list)]",
+    "name=type",
+    "<description of what the function returns>",
+    "Defined in interface module (when it exists)",
+    "parameter[(dimensions)]=type(access)",
+    "<description of parameter>",
+    "<description of how the task works>",
+    "<description of how the subroutine works>",
+    "<description of how the function works>",
+    "<description of any deficiencies>",
+    '<description of any "bugs" which have not been fixed>',
+    "author (institution::username)",
+    "date:  changes (institution::username)",
+    "<any INCLUDE files containing global constant definitions>",
+    "<declarations and descriptions for imported arguments>",
+    "<declarations and descriptions for imported/exported arguments>",
+    "<declarations and descriptions for exported arguments>",
+    "<declaration for status argument>",
+    "<declarations for external function references>",
+    "<local constants defined by PARAMETER>",
+    "<declarations for local variables>",
+    "<any INCLUDE files for global variables held in named COMMON>",
+    "<declarations for internal functions>",
+    "<any DATA initialisations for local variables>",
+    "<subroutine code>",
+    "<function code>",
+)
+"""Unfilled old-ADAM template placeholders, as listed by ``SST_ZAPAP``."""
+
 _FORTRAN_TERMINATORS = {
     "export",
     "external references",
@@ -117,6 +158,14 @@ def _extract_fortran(
                 index += 1
                 break
 
+            # SST_RDAD1 disregards the "endhistory" line and stops
+            # reading, so comments in the code that follows stay out.
+            if line[:1] in _COMMENT_CHARACTERS and line[1:].strip().casefold() == "endhistory":
+                end = number
+                terminated = True
+                index += 1
+                break
+
             heading = _FORTRAN_HEADING_RE.fullmatch(line)
             if heading is not None:
                 title = heading.group("title").strip()
@@ -134,10 +183,10 @@ def _extract_fortran(
                             LocatedLine(number=number, text=f"     {module.group('type').strip()}"),
                         )
                     )
-                elif line and line[0] in "*Cc#":
-                    content = line[1:].rstrip()
-                    if content.strip().casefold() != "endhistory":
-                        normalized.append(_content_line(number, content))
+                elif line[:1] in _COMMENT_CHARACTERS:
+                    # SST_RDAD1 blanks the comment character rather than
+                    # removing it, so the rest of the line keeps its column.
+                    normalized.append(_content_line(number, f" {line[1:]}"))
             end = number
             index += 1
 
@@ -276,22 +325,46 @@ def _title_key(title: str) -> str:
     return " ".join(title.casefold().split())
 
 
+def _zap_placeholders(line: str) -> str:
+    """Blank unfilled old-ADAM placeholders in a prologue line.
+
+    Parameters
+    ----------
+    line
+        One prologue line with its comment character already blanked.
+
+    Returns
+    -------
+    zapped : `str`
+        The line with every recognized placeholder replaced by blanks, so
+        that surrounding text keeps its original column.
+    """
+    found = True
+    while found:
+        found = False
+        for placeholder in _ADAM_PLACEHOLDERS:
+            position = line.find(placeholder)
+            if position >= 0:
+                end = position + len(placeholder)
+                line = f"{line[:position]}{' ' * len(placeholder)}{line[end:]}"
+                found = True
+                break
+    return line
+
+
 def _content_line(number: int, content: str) -> LocatedLine:
-    if not content.strip():
+    text = _zap_placeholders(content).rstrip()
+    if not text.strip():
         return LocatedLine(number=number, text="")
-    stripped = content.lstrip()
-    if stripped.casefold().startswith("<description of "):
-        return LocatedLine(number=number, text="")
-    indentation = len(content.expandtabs(8)) - len(content.expandtabs(8).lstrip())
-    return LocatedLine(number=number, text=" " * max(5, indentation) + stripped)
+    return LocatedLine(number=number, text=text)
 
 
 def _strip_c_content(line: str) -> str:
     content = line.rstrip()
-    stripped = content.lstrip()
-    if stripped.startswith("*"):
-        stripped = stripped[1:]
-    return stripped
+    indentation = len(content) - len(content.lstrip())
+    if content[indentation : indentation + 1] == "*":
+        return f"{content[:indentation]} {content[indentation + 1 :]}"
+    return content
 
 
 def _c_block_lines(lines: list[str]) -> list[bool]:

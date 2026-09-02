@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from starprolog import (
     InputFormat,
+    ParagraphBlock,
     PrologueSyntax,
     SectionRole,
     parse_text,
@@ -112,3 +113,123 @@ def test_input_format_can_disable_legacy_detection() -> None:
     )
 
     assert not collection.prologues
+
+
+def test_legacy_c_body_indentation_is_preserved() -> None:
+    """Old C prologue bodies keep the nesting implied by their indentation."""
+    collection = parse_text(
+        """\
+/*+ ems_annul - Annul the current error context */
+void ems_annul(int *status)
+/* Description :
+      Annul the contents of the current error context.
+   Parameters :
+      status = int * (Given and Returned)
+         The global status.
+*/
+{
+}
+""",
+        source="ems_annul.c",
+    )
+
+    arguments = collection.prologues[0].sections[3]
+    assert arguments.role is SectionRole.ARGUMENTS
+    assert [sub.title for sub in arguments.subsections] == ["status = int * (Given and Returned)"]
+    body = arguments.subsections[0].blocks[0]
+    assert isinstance(body, ParagraphBlock)
+    assert body.lines == ("The global status.",)
+
+
+def test_endhistory_terminates_the_legacy_prologue() -> None:
+    """SST_RDAD1 stops reading the prologue at an endhistory line."""
+    collection = parse_text(
+        """\
+*+ SUMMED - Sum the pixels
+*    Description :
+*     Sum the pixels.
+*    History :
+*     1-SEP-1990: Original version. (ABC)
+*    endhistory
+*
+*  Loop over the pixels.
+      DO 1 I = 1, 10
+*  Accumulate the sum.
+1     CONTINUE
+      END
+""",
+        source="summed.f",
+    )
+
+    assert not collection.diagnostics
+    history = collection.prologues[0].sections[-1]
+    assert history.role is SectionRole.HISTORY
+    assert [sub.title for sub in history.subsections] == ["1-SEP-1990: Original version. (ABC)"]
+
+
+def test_result_section_becomes_returned_value() -> None:
+    """SST_TRCVT renames the old Result section to Returned Value."""
+    collection = parse_text(
+        """\
+*+ SLA_EPB - Convert an MJD to a Besselian epoch
+*    Description :
+*     Convert an MJD to a Besselian epoch.
+*    Result :
+*     SLA_EPB = DOUBLE PRECISION
+*        The Besselian epoch.
+*-
+""",
+        source="sla_epb.f",
+    )
+
+    section = collection.prologues[0].sections[-1]
+    assert section.title == "Returned Value"
+    assert section.role is SectionRole.RETURNED_VALUE
+    assert [sub.title for sub in section.subsections] == ["SLA_EPB = DOUBLE PRECISION"]
+
+
+def test_old_adam_placeholders_are_blanked() -> None:
+    """SST_ZAPAP blanks unfilled old-ADAM placeholders wherever they appear."""
+    collection = parse_text(
+        """\
+*+ TEMPLATE - Demonstrate placeholders
+*    Invocation :
+*     CALL name[(argument_list)]
+*    Authors :
+*     author (institution::username)
+*    History :
+*     date:  changes (institution::username)
+*-
+""",
+        source="template.f",
+    )
+
+    prologue = collection.prologues[0]
+    assert [section.title for section in prologue.sections] == [
+        "Name",
+        "Purpose",
+        "Invocation",
+        "Authors",
+        "History",
+    ]
+    assert not any(section.has_content for section in prologue.sections[2:])
+
+
+def test_shallow_legacy_body_indentation_is_not_clamped() -> None:
+    """Legacy body lines keep their own column instead of a fixed minimum."""
+    collection = parse_text(
+        """\
+*+ SHALLOW - Demonstrate shallow indentation
+*    Parameters :
+*  VALUE = INTEGER (Given)
+*   The value.
+*-
+""",
+        source="shallow.f",
+    )
+
+    arguments = collection.prologues[0].sections[-1]
+    assert [sub.title for sub in arguments.subsections] == ["VALUE = INTEGER (Given)"]
+    body = arguments.subsections[0].blocks[0]
+    assert isinstance(body, ParagraphBlock)
+    assert body.lines == ("The value.",)

@@ -161,6 +161,13 @@ class LineBlock(FrozenModel):
 
     type: Literal["line_block"] = "line_block"
     lines: tuple[str, ...]
+    marker_indent: int = Field(default=0, ge=0)
+    """Indentation of the opening ``---`` marker, relative to the section body.
+
+    Renderers measure preserved indentation from the marker rather than from
+    the block content, so a uniformly indented block keeps its indentation.
+    """
+
     source: SourceSpan
 
 

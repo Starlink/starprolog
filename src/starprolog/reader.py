@@ -368,10 +368,10 @@ def _detect_container(
         if line.strip():
             previous = line.strip()
             break
-    if previous.startswith("/*") or marker_indent:
-        return SourceContainer.C_BLOCK, None
     if previous in {"'''", '"""'}:
         return SourceContainer.PYTHON_STRING, previous
+    if previous.startswith("/*") or marker_indent:
+        return SourceContainer.C_BLOCK, None
     return SourceContainer.PLAIN, None
 
 
@@ -416,7 +416,7 @@ def _normalize_line(
                 text=_remove_placeholders(selector_match.group("text")).rstrip(),
             )
 
-    if container is SourceContainer.C_BLOCK:
+    if container in {SourceContainer.C_BLOCK, SourceContainer.PYTHON_STRING}:
         match = _C_BLOCK_LINE_RE.fullmatch(raw_line)
         if match is None:
             return None
@@ -447,21 +447,58 @@ def _parse_prologue(raw: RawPrologue, diagnostics: list[Diagnostic]) -> Prologue
     )
 
 
+def _find_sections(lines: Sequence[LocatedLine]) -> list[tuple[int, int]]:
+    """Locate section headers and their bodies the way ``SST_FSECT`` does.
+
+    The first non-blank line is always a header, whatever its indentation.
+    Each later header is the next non-blank line indented no more than the
+    previous header, so header levels chain downwards rather than being fixed
+    by the smallest indentation anywhere in the text. A body runs to the last
+    non-blank line indented more than its own header.
+
+    Parameters
+    ----------
+    lines
+        Normalized prologue or section-body lines.
+
+    Returns
+    -------
+    sections : `list` [`tuple` [`int`, `int`]]
+        Header index and body stop index for each section found.
+    """
+    found: list[tuple[int, int]] = []
+    limit: int | None = None
+    start = 0
+    while True:
+        header = None
+        for index in range(start, len(lines)):
+            if not lines[index].text.strip():
+                continue
+            if limit is None or _indent(lines[index].text) <= limit:
+                header = index
+                break
+        if header is None:
+            return found
+        limit = _indent(lines[header].text)
+        last = header
+        for index in range(header + 1, len(lines)):
+            if not lines[index].text.strip():
+                continue
+            if _indent(lines[index].text) > limit:
+                last = index
+            else:
+                break
+        found.append((header, last + 1))
+        start = header + 1
+
+
 def _parse_sections(
     lines: Sequence[LocatedLine], source: str, diagnostics: list[Diagnostic]
 ) -> list[Section]:
-    nonblank = [line for line in lines if line.text.strip()]
-    if not nonblank:
-        return []
-    base_indent = min(_indent(line.text) for line in nonblank)
-    header_indexes = [
-        index for index, line in enumerate(lines) if line.text.strip() and _indent(line.text) == base_indent
-    ]
     sections: list[Section] = []
 
-    for position, header_index in enumerate(header_indexes):
+    for header_index, stop_index in _find_sections(lines):
         header = lines[header_index]
-        stop_index = header_indexes[position + 1] if position + 1 < len(header_indexes) else len(lines)
         body = _trim_blank_lines(lines[header_index + 1 : stop_index])
         title = header.text.strip().removesuffix(":").rstrip()
         role = _role_for_title(title)
@@ -490,17 +527,9 @@ def _parse_sections(
 def _parse_subsections(
     lines: Sequence[LocatedLine], source: str, diagnostics: list[Diagnostic]
 ) -> list[Section]:
-    nonblank = [line for line in lines if line.text.strip()]
-    if not nonblank:
-        return []
-    base_indent = min(_indent(line.text) for line in nonblank)
-    header_indexes = [
-        index for index, line in enumerate(lines) if line.text.strip() and _indent(line.text) == base_indent
-    ]
     subsections: list[Section] = []
-    for position, header_index in enumerate(header_indexes):
+    for header_index, stop_index in _find_sections(lines):
         header = lines[header_index]
-        stop_index = header_indexes[position + 1] if position + 1 < len(header_indexes) else len(lines)
         body = _trim_blank_lines(lines[header_index + 1 : stop_index])
         end_line = lines[stop_index - 1].number if stop_index > header_index + 1 else header.number
         subsections.append(
@@ -516,10 +545,19 @@ def _parse_subsections(
 def _parse_blocks(lines: Sequence[LocatedLine], source: str, diagnostics: list[Diagnostic]) -> list[Block]:
     if not lines:
         return []
+    base_indent = _base_indent(lines)
     blocks: list[Block] = []
     ordinary: list[LocatedLine] = []
     preserved: list[LocatedLine] | None = None
     marker_line: LocatedLine | None = None
+
+    def make_line_block(content: Sequence[LocatedLine], first: int, last: int) -> LineBlock:
+        marker = _indent(marker_line.text) - base_indent if marker_line is not None else 0
+        return LineBlock(
+            lines=tuple(item.text for item in _shift_lines(content, base_indent)),
+            marker_indent=marker,
+            source=SourceSpan(path=source, start_line=first, end_line=last),
+        )
 
     for line in lines:
         if line.text.strip() == "---":
@@ -530,13 +568,7 @@ def _parse_blocks(lines: Sequence[LocatedLine], source: str, diagnostics: list[D
                 marker_line = line
             else:
                 first = marker_line.number if marker_line is not None else line.number
-                content = _dedent_lines(preserved)
-                blocks.append(
-                    LineBlock(
-                        lines=tuple(item.text for item in content),
-                        source=SourceSpan(path=source, start_line=first, end_line=line.number),
-                    )
-                )
+                blocks.append(make_line_block(preserved, first, line.number))
                 preserved = None
                 marker_line = None
             continue
@@ -548,12 +580,7 @@ def _parse_blocks(lines: Sequence[LocatedLine], source: str, diagnostics: list[D
     if preserved is not None:
         first = marker_line.number if marker_line is not None else preserved[0].number
         last = preserved[-1].number if preserved else first
-        blocks.append(
-            LineBlock(
-                lines=tuple(item.text for item in _dedent_lines(preserved)),
-                source=SourceSpan(path=source, start_line=first, end_line=last),
-            )
-        )
+        blocks.append(make_line_block(preserved, first, last))
         diagnostics.append(
             Diagnostic(
                 severity=DiagnosticSeverity.WARNING,
@@ -620,7 +647,7 @@ def _parse_ordinary_blocks(lines: Sequence[LocatedLine], source: str) -> list[Bl
 
         for line in dedented:
             stripped = line.text.lstrip()
-            if stripped.startswith("-") and not stripped.startswith("--"):
+            if stripped.startswith("-"):
                 flush_paragraph()
                 flush_item()
                 item_text = stripped[1:]
@@ -662,11 +689,12 @@ def _parse_ordinary_blocks(lines: Sequence[LocatedLine], source: str) -> list[Bl
     return blocks
 
 
-def _dedent_lines(lines: Sequence[LocatedLine]) -> list[LocatedLine]:
+def _base_indent(lines: Sequence[LocatedLine]) -> int:
     nonblank = [line for line in lines if line.text.strip()]
-    if not nonblank:
-        return [LocatedLine(number=line.number, text="") for line in lines]
-    base_indent = min(_indent(line.text) for line in nonblank)
+    return min((_indent(line.text) for line in nonblank), default=0)
+
+
+def _shift_lines(lines: Sequence[LocatedLine], base_indent: int) -> list[LocatedLine]:
     return [
         LocatedLine(
             number=line.number,
@@ -674,6 +702,10 @@ def _dedent_lines(lines: Sequence[LocatedLine]) -> list[LocatedLine]:
         )
         for line in lines
     ]
+
+
+def _dedent_lines(lines: Sequence[LocatedLine]) -> list[LocatedLine]:
+    return _shift_lines(lines, _base_indent(lines))
 
 
 def _trim_blank_lines(lines: Sequence[LocatedLine]) -> list[LocatedLine]:

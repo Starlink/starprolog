@@ -124,3 +124,78 @@ def test_description_is_optional() -> None:
 
     assert "SHORT" in result
     assert "\\sstdescription{" not in result
+
+
+def test_type_and_class_membership_render_as_diy_topics() -> None:
+    """Prolat's inhibit list covers neither Type nor Class Membership."""
+    collection = parse_text(
+        """\
+*+
+*  Name:
+*     ROLES
+*  Purpose:
+*     Check role handling.
+*  Type:
+*     Public attribute.
+*  Class Membership:
+*     Frame method.
+*  Copyright:
+*     Nobody.
+*-
+"""
+    )
+
+    result = render_latex(collection)
+
+    assert "\\sstdiytopic{\n      Type\n   }{\n      Public attribute.\n   }" in result
+    assert "\\sstdiytopic{\n      Class Membership\n   }{\n      Frame method.\n   }" in result
+    assert "Nobody." not in result
+
+
+def test_preserved_block_indentation_is_measured_from_the_marker() -> None:
+    r"""SST_LATP bases \hspace* on the column of the '---' marker."""
+    collection = parse_text(
+        """\
+*+
+*  Name:
+*     BLOCK
+*  Purpose:
+*     Test blocks.
+*  Description:
+*     Intro.
+*     ---
+*        Three past.
+*          Five past.
+*     ---
+*     Outro.
+*-
+"""
+    )
+
+    result = render_latex(collection)
+
+    assert "\\hspace*{1.5 em}\n         Three past." in result
+    assert "\\hspace*{2.5 em}\n           Five past." in result
+
+
+def test_preserved_block_closing_marker_emits_a_newline() -> None:
+    r"""SST_LATP writes \newline at both '---' markers."""
+    collection = parse_text(
+        """\
+*+
+*  Name:
+*     BLOCK
+*  Purpose:
+*     Test blocks.
+*  Description:
+*     ---
+*     One.
+*     Two.
+*     ---
+*-
+"""
+    )
+
+    result = render_latex(collection)
+
+    assert result.count("\\newline") == 5

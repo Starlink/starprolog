@@ -74,10 +74,8 @@ _EXCLUDED_ROLES = {
     SectionRole.NAME,
     SectionRole.PURPOSE,
     SectionRole.LANGUAGE,
-    SectionRole.CLASS_MEMBERSHIP,
     SectionRole.TYPE_OF_MODULE,
     SectionRole.SYNOPSIS,
-    SectionRole.TYPE,
     SectionRole.AUTHORS,
     SectionRole.HISTORY,
     SectionRole.IMPLEMENTATION_DEFICIENCIES,
@@ -334,9 +332,14 @@ def _render_line_block(block: LineBlock, *, indent: int) -> list[str]:
     prefix = " " * indent
     output = [f"{prefix}\\newline", f"{prefix}\\newline"]
     for line in block.lines:
+        if not line.strip():
+            output.append(f"{prefix}\\newline")
+            continue
         leading = len(line) - len(line.lstrip(" "))
-        content = escape_latex(line[leading:])
-        spacing = f"\\hspace*{{{leading / 2:g}em}}" if leading else ""
-        output.append(f"{prefix}{spacing}{content}")
+        spaces = leading - block.marker_indent
+        if spaces > 0:
+            output.append(f"{prefix}\\hspace*{{{spaces / 2:g} em}}")
+        output.append(f"{prefix}{' ' * leading}{escape_latex(line[leading:])}")
         output.append(f"{prefix}\\newline")
+    output.append(f"{prefix}\\newline")
     return output

@@ -152,7 +152,8 @@ print("done")
     description = collection.prologues[0].sections[2]
     assert isinstance(description.blocks[0], ParagraphBlock)
     assert isinstance(description.blocks[1], LineBlock)
-    assert description.blocks[1].lines == ("key = value", "  indented = true")
+    assert description.blocks[1].lines == ("   key = value", "     indented = true")
+    assert description.blocks[1].marker_indent == 0
 
 
 def test_eof_terminated_prologue_is_retained_with_warning() -> None:
@@ -192,13 +193,88 @@ def test_tab_indented_body_does_not_hide_section_headings() -> None:
     ]
 
 
-def test_double_hyphen_text_is_not_an_item() -> None:
-    """Double-hyphen prose is retained rather than parsed as a list item."""
+def test_double_hyphen_starts_an_item_consuming_one_hyphen() -> None:
+    """SST_LATP starts an item on any leading hyphen and skips just one."""
     collection = parse_text(
         "*+\n*  Name:\n*     DASHES\n*  Purpose:\n*     Test dashes.\n"
         "*  Description:\n*     -- VALUE=0 retains its meaning.\n*-\n"
     )
 
     description = collection.prologues[0].sections[2]
-    assert isinstance(description.blocks[0], ParagraphBlock)
-    assert description.blocks[0].lines == ("-- VALUE=0 retains its meaning.",)
+    assert isinstance(description.blocks[0], ItemListBlock)
+    assert description.blocks[0].items[0].lines == ("- VALUE=0 retains its meaning.",)
+
+
+def test_indented_python_docstring_prologue_is_terminated() -> None:
+    """A prologue inside an indented docstring ends at the closing quotes."""
+    source = '''\
+def demo():
+    """
+    *+
+    *  Name:
+    *     demo
+    *  Purpose:
+    *     Parse an indented docstring.
+    """
+    return 0
+
+
+def other():
+    """
+    *+
+    *  Name:
+    *     other
+    *  Purpose:
+    *     Follow the first docstring.
+    """
+    return 1
+'''
+    collection = parse_text(source, source="demo.py")
+
+    assert not collection.diagnostics
+    assert [prologue.name for prologue in collection.prologues] == ["demo", "other"]
+
+
+def test_leading_text_above_the_first_header_becomes_a_section() -> None:
+    """SST_FSECT treats the first non-blank line as a section header."""
+    collection = parse_text(
+        "*+\n"
+        "*     Stray leading text.\n"
+        "*        Indented under stray.\n"
+        "*  Name:\n"
+        "*     STRAY\n"
+        "*  Purpose:\n"
+        "*     Check stray handling.\n"
+        "*-\n"
+    )
+
+    prologue = collection.prologues[0]
+    assert prologue.name == "STRAY"
+    assert [section.title for section in prologue.sections] == [
+        "Stray leading text.",
+        "Name",
+        "Purpose",
+    ]
+    stray = prologue.sections[0].blocks[0]
+    assert isinstance(stray, ParagraphBlock)
+    assert stray.lines == ("Indented under stray.",)
+
+
+def test_header_shallower_than_the_first_keeps_earlier_sections() -> None:
+    """Header indents chain from the previous header, not a global minimum."""
+    collection = parse_text(
+        "*+\n"
+        "*  Name:\n"
+        "*     ODD\n"
+        "*  Purpose:\n"
+        "*     Check shallow headers.\n"
+        "* Odd:\n"
+        "*    Shallow section body.\n"
+        "*-\n"
+    )
+
+    assert [section.title for section in collection.prologues[0].sections] == [
+        "Name",
+        "Purpose",
+        "Odd",
+    ]
