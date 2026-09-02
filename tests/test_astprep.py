@@ -73,6 +73,55 @@ f     INTEGER
     assert "\\sstapplicability{" in latex
 
 
+def test_prepare_attribute_excludes_protected_marker() -> None:
+    """AST attribute mode selects public ``att++`` markers only."""
+    public = """\
+/*
+*att++
+*  Name:
+*     PublicAttribute
+*  Purpose:
+*     A public attribute.
+*att--
+*/
+"""
+    protected = """\
+/*
+*att+
+*  Name:
+*     ProtectedAttribute
+*  Purpose:
+*     A protected attribute.
+*att-
+*/
+"""
+    collection = parse_text(public + protected, language=InputLanguage.C)
+    options = AstPrepOptions(kind=AstEntityKind.ATTRIBUTE)
+
+    result = prepare_ast(collection, options=options)
+
+    assert result.labels == ("PublicAttribute",)
+
+
+def test_language_specific_markers_follow_getatt_selection() -> None:
+    """C and Fortran modes accept only their own language marker."""
+    source = _routine("astCommon", "AST_COMMON")
+    source += _language_routine("c", "astConly")
+    source += _language_routine("f", "AST_FONLY")
+
+    c_result = prepare_ast(
+        parse_text(source, language=InputLanguage.C),
+        options=AstPrepOptions(language=InputLanguage.C),
+    )
+    fortran_result = prepare_ast(
+        parse_text(source, language=InputLanguage.FORTRAN),
+        options=AstPrepOptions(language=InputLanguage.FORTRAN),
+    )
+
+    assert c_result.labels == ("astCommon", "astConly")
+    assert fortran_result.labels == (r"AST\_COMMON", r"AST\_FONLY")
+
+
 def test_fortran_routines_keep_general_sst_macros() -> None:
     """Fortran mode retains the invocation and arguments macro names."""
     collection = parse_text(
@@ -168,5 +217,18 @@ f     VALUE = INTEGER (Given)
 *  Copyright:
 *     Copyright text.
 *--
+*/
+"""
+
+
+def _language_routine(marker: str, name: str) -> str:
+    return f"""\
+/*
+{marker}++
+*  Name:
+*     {name}
+*  Purpose:
+*     Exercise a language-specific prologue marker.
+{marker}--
 */
 """

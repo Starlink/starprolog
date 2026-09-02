@@ -29,7 +29,9 @@ from .models import (
     SourceSpan,
 )
 
-_MARKER_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<comment>[*Cc#])(?P<tag>[A-Za-z]*)(?P<sign>[+-]{1,2})[ \t]*$")
+_MARKER_RE = re.compile(
+    r"^(?P<indent>[ \t]*)(?P<comment>[*CcFf#])(?P<tag>[A-Za-z]*)(?P<sign>[+-]{1,2})[ \t]*$"
+)
 _C_BLOCK_LINE_RE = re.compile(r"^[ \t]*\*(?P<text>.*)$")
 _PLAIN_SELECTOR_RE = re.compile(r"^(?P<language>[cf])(?P<text>(?:[ \t].*)?)$")
 _HASH_SELECTOR_RE = re.compile(r"^#(?P<language>[cf])(?P<text>(?:[ \t].*)?)$")
@@ -342,7 +344,7 @@ def _normalize_line(
         if match is None:
             return None
         value = match.group("text")
-    elif raw_line[0] in "*Cc#":
+    elif raw_line[0] in "*CcFf#":
         value = raw_line[1:]
     else:
         return None

@@ -97,14 +97,20 @@ def prepare_ast(collection: PrologueCollection, *, options: AstPrepOptions) -> A
         raise ValueError("collection language does not match the AST preprocessing language")
 
     expected_marker = _MARKER_KINDS[options.kind]
-    expected_comment = "#" if options.unix_script else "*"
+    if options.unix_script:
+        expected_comments = {"#"}
+    else:
+        language_comment = "c" if options.language is InputLanguage.C else "f"
+        expected_comments = {"*", language_comment}
     by_name: dict[str, Prologue] = {}
     diagnostics = list(collection.diagnostics)
 
     for prologue in collection.prologues:
         if prologue.marker.kind is not expected_marker:
             continue
-        if prologue.marker.comment_character != expected_comment:
+        if prologue.marker.delimiter_width != 2:
+            continue
+        if prologue.marker.comment_character not in expected_comments:
             continue
         if prologue.name is None:
             diagnostics.append(
