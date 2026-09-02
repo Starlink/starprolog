@@ -77,10 +77,17 @@ model with `--format json`. `--unix-script` selects the hash-comment command
 prologues formerly requested with `getatt -u`. This is an AST extension, not a
 general Starlink prologue convention. POD is not supported.
 
-## SLALIB-style prologues
+## SLALIB-style prologues (experimental)
 
 SLALIB and the applications derived from it use a third convention, which no
 SST tool ever read.
+
+Support for it is experimental. There is no original implementation to check
+it against, unlike the other two formats, so it has been validated only
+against the Starlink tree itself and against expectations written by hand.
+Both the rules that recognize a heading and the shape of the resulting
+document tree may still change, and neither is covered by any compatibility
+guarantee.
 A bare `*+` is followed by a rule of spaced hyphens, the routine name spelled
 out letter by letter, and a second rule:
 
@@ -114,27 +121,38 @@ A main program gets neither, since it is not invoked.
 
 ### Known gaps
 
-These prologues have no `Description:` section, and `prohlp` treats one as
-mandatory, so `starprolog hlp` rejects them.
-Only the LaTeX renderer is useful for this format at present, and it accepts
-311 of the 313 prologues found.
+**Help output is not available.** These prologues have no `Description:`
+section, and `prohlp` treats one as mandatory, so `starprolog hlp` rejects
+all 313 of them. Only the LaTeX renderer is useful for this format at
+present, and it accepts 311.
 
-`Given:` and `Returned:` are left as ordinary topics rather than folded into
-an `Arguments:` section.
-Their bodies are columnar, `NAME  type  description`, with no counterpart to
-the `NAME = TYPE (Given)` syntax the SST renderers expect, and the columns
-reflow when LaTeX sets them as a paragraph.
-Converting them would mean guessing where each column starts.
+**Argument lists are not converted, and reflow.** `Given:`, `Returned:` and
+`Given and returned:` are left as ordinary topics rather than folded into an
+`Arguments:` section, so their columns run together when LaTeX sets them as a
+paragraph. The conversion looks tractable: the bodies are
+`NAME  type  description`, and splitting on runs of two or more spaces yields
+three fields for 797 of the 809 argument lines in SLALIB, the rest separating
+the name from the type with a single space. Each entry would become a
+`NAME = type (Given)` subsection with the description as its body, and a
+continuation line, indented past its entry, would join that description.
+This is deferred rather than ruled out.
 
-The author, date and copyright lines are unlabelled free text at the same
-indentation as the headings, so each is recorded as a topic of its own rather
-than as an `Authors:` or `Copyright:` section.
-Having no body, they are dropped by the renderers, exactly as `prolat` drops a
-section with no content.
+**Author and copyright lines are dropped.** They are unlabelled free text at
+the same indentation as the headings, so each is recorded as a topic of its
+own rather than as an `Authors:` or `Copyright:` section. Having no body, the
+renderers then drop them, exactly as `prolat` drops any section with no
+content. Recognizing them means matching their shape, which is why it has not
+been done.
 
-A purpose line that ends in a colon and introduces an indented list is
-indistinguishable from a section heading, and is read as one.
-Two of the 313 prologues lose their purpose this way.
+**A purpose can be mistaken for a heading.** A purpose line that ends in a
+colon and introduces an indented list is structurally indistinguishable from
+a section heading, and is read as one. Two of the 313 prologues lose their
+purpose this way.
+
+**The banner name is never used.** The routine name always comes from the
+declaration above the prologue, and nothing checks it against the name spelled
+out in the banner. A prologue with no declaration above it has no name, and so
+cannot be rendered at all.
 
 ## Compatibility with prolat and prohlp
 

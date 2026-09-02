@@ -50,6 +50,12 @@ def extract_slalib_prologues(
     rule. There is no ``Name:`` or ``Purpose:`` heading, so both are
     recovered from the banner's surroundings.
 
+    This reader is experimental. No SST tool read the convention, so there is
+    no original implementation to check it against, and the rules that
+    separate a heading from prose containing a colon are judgements rather
+    than a port. Both those rules and the shape of the resulting sections may
+    change. The README records what it does not yet handle.
+
     Parameters
     ----------
     text

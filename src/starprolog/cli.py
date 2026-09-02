@@ -14,7 +14,8 @@ from .models import DocumentationMode, InputFormat, InputLanguage, PrologueColle
 from .reader import parse_paths
 
 _INPUT_FORMAT_HELP = (
-    "Detect STARLSE, old ADAM/SSE and SLALIB prologues, select one source format, or load serialized JSON."
+    "Detect STARLSE, old ADAM/SSE and SLALIB prologues, select one source format, "
+    "or load serialized JSON. SLALIB support is experimental."
 )
 
 
