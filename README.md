@@ -20,10 +20,11 @@ starprolog parse source.f source.c -o prologues.json
 ```
 
 Input format detection recognizes both modern STARLSE prologues and the old
-ADAM/SSE Fortran and BDK-style C conventions formerly handled by `procvt`.
+ADAM/SSE Fortran and BDK-style C conventions formerly handled by `procvt`,
+and the SLALIB banner convention described below.
 Each prologue records its detected syntax in the intermediate representation.
-Detection can be overridden with `--input-format starlse` or
-`--input-format adamsse`.
+Detection can be overridden with `--input-format starlse`,
+`--input-format adamsse` or `--input-format slalib`.
 
 Use `--language c` or `--language fortran` to select language-specific lines
 in AST-style public prologues. By default, both variants are retained.
@@ -75,6 +76,65 @@ section transformations, and can emit either drop-in LaTeX or its Pydantic
 model with `--format json`. `--unix-script` selects the hash-comment command
 prologues formerly requested with `getatt -u`. This is an AST extension, not a
 general Starlink prologue convention. POD is not supported.
+
+## SLALIB-style prologues
+
+SLALIB and the applications derived from it use a third convention, which no
+SST tool ever read.
+A bare `*+` is followed by a rule of spaced hyphens, the routine name spelled
+out letter by letter, and a second rule:
+
+```fortran
+      SUBROUTINE sla_DTP2S (XI, ETA, RAZ, DECZ, RA, DEC)
+*+
+*     - - - - - -
+*      D T P 2 S
+*     - - - - - -
+*
+*  Transform tangent plane coordinates into spherical
+*
+*  Given:
+*     XI,ETA      dp   tangent plane rectangular coordinates
+*-
+```
+
+That banner is what identifies the format.
+It is present in all 193 SLALIB source files and in 313 prologues across the
+whole Starlink tree, and none of them carries a `Name:` heading, so detection
+never has to choose between this convention and the other two.
+
+There are no `Name:` or `Purpose:` headings, so both are recovered from the
+banner's surroundings: the name from the program-unit declaration above it,
+and the purpose from the free text between the banner and the first heading.
+An `Invocation:` section is derived from that same declaration, as a `CALL`
+for a subroutine and an assignment for a function, following the forms
+`SST_TRCVT` supplies when an invocation is missing.
+A main program gets neither, since it is not invoked.
+`Result:` becomes `Returned Value`; every other heading keeps its own name.
+
+### Known gaps
+
+These prologues have no `Description:` section, and `prohlp` treats one as
+mandatory, so `starprolog hlp` rejects them.
+Only the LaTeX renderer is useful for this format at present, and it accepts
+311 of the 313 prologues found.
+
+`Given:` and `Returned:` are left as ordinary topics rather than folded into
+an `Arguments:` section.
+Their bodies are columnar, `NAME  type  description`, with no counterpart to
+the `NAME = TYPE (Given)` syntax the SST renderers expect, and the columns
+reflow when LaTeX sets them as a paragraph.
+Converting them would mean guessing where each column starts.
+
+The author, date and copyright lines are unlabelled free text at the same
+indentation as the headings, so each is recorded as a topic of its own rather
+than as an `Authors:` or `Copyright:` section.
+Having no body, they are dropped by the renderers, exactly as `prolat` drops a
+section with no content.
+
+A purpose line that ends in a colon and introduces an indented list is
+indistinguishable from a section heading, and is read as one.
+Two of the 313 prologues lose their purpose this way.
 
 ## Compatibility with prolat and prohlp
 

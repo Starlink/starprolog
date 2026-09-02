@@ -48,6 +48,7 @@ class InputFormat(StrEnum):
     AUTO = "auto"
     STARLSE = "starlse"
     ADAMSSE = "adamsse"
+    SLALIB = "slalib"
     JSON = "json"
 
 
@@ -57,6 +58,7 @@ class PrologueSyntax(StrEnum):
     STARLSE = "starlse"
     ADAMSSE_FORTRAN = "adamsse-fortran"
     ADAMSSE_C = "adamsse-c"
+    SLALIB = "slalib"
 
 
 class DiagnosticSeverity(StrEnum):

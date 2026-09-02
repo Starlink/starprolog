@@ -240,33 +240,57 @@ def _load_json_paths(paths: Sequence[Path]) -> PrologueCollection:
 
 
 def _parse_source(text: str, source: str, options: ReaderOptions) -> tuple[list[Prologue], list[Diagnostic]]:
+    auto = options.input_format is InputFormat.AUTO
     raw_prologues: list[RawPrologue] = []
     diagnostics: list[Diagnostic] = []
+
+    # SLALIB prologues open with the same bare delimiter as STARLSE ones, so
+    # they are recognized first and the others are filtered against them.
+    if options.input_format in {InputFormat.AUTO, InputFormat.SLALIB}:
+        from .slalib import extract_slalib_prologues
+
+        banner, banner_diagnostics = extract_slalib_prologues(text, source)
+        raw_prologues.extend(banner)
+        diagnostics.extend(banner_diagnostics)
+
     if options.input_format in {InputFormat.AUTO, InputFormat.STARLSE}:
         modern, modern_diagnostics = _extract_prologues(text, source, options)
+        if auto:
+            modern, modern_diagnostics = _without_overlaps(modern, modern_diagnostics, raw_prologues)
         raw_prologues.extend(modern)
         diagnostics.extend(modern_diagnostics)
+
     if options.input_format in {InputFormat.AUTO, InputFormat.ADAMSSE}:
         from .adamsse import extract_adamsse_prologues
 
         legacy, legacy_diagnostics = extract_adamsse_prologues(text, source)
-        if options.input_format is InputFormat.AUTO:
-            legacy = [
-                candidate
-                for candidate in legacy
-                if not any(_spans_overlap(candidate.source, modern.source) for modern in raw_prologues)
-            ]
-            legacy_diagnostics = [
-                diagnostic
-                for diagnostic in legacy_diagnostics
-                if diagnostic.source is None
-                or any(diagnostic.source == candidate.source for candidate in legacy)
-            ]
+        if auto:
+            legacy, legacy_diagnostics = _without_overlaps(legacy, legacy_diagnostics, raw_prologues)
         raw_prologues.extend(legacy)
         diagnostics.extend(legacy_diagnostics)
+
     raw_prologues.sort(key=lambda prologue: prologue.source.start_line)
     prologues = [_parse_prologue(raw, diagnostics) for raw in raw_prologues]
     return prologues, diagnostics
+
+
+def _without_overlaps(
+    candidates: list[RawPrologue],
+    diagnostics: list[Diagnostic],
+    accepted: Sequence[RawPrologue],
+) -> tuple[list[RawPrologue], list[Diagnostic]]:
+    """Drop candidates covering source already claimed by another reader."""
+    kept = [
+        candidate
+        for candidate in candidates
+        if not any(_spans_overlap(candidate.source, other.source) for other in accepted)
+    ]
+    retained = [
+        diagnostic
+        for diagnostic in diagnostics
+        if diagnostic.source is None or any(diagnostic.source == candidate.source for candidate in kept)
+    ]
+    return kept, retained
 
 
 def _spans_overlap(first: SourceSpan, second: SourceSpan) -> bool:
