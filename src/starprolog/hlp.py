@@ -8,8 +8,8 @@ __all__ = (
 )
 
 import re
-from enum import StrEnum
 
+from .models import DocumentationMode as HlpMode
 from .models import (
     FrozenModel,
     ItemListBlock,
@@ -20,14 +20,6 @@ from .models import (
     Section,
     SectionRole,
 )
-
-
-class HlpMode(StrEnum):
-    """Kind of Starlink help-library documentation being rendered."""
-
-    AUTO = "auto"
-    ATASK = "atask"
-    LIBRARY = "library"
 
 
 class HlpOptions(FrozenModel):
@@ -109,12 +101,12 @@ def render_prologue_hlp(
         contract is absent.
     """
     selected = options or HlpOptions()
-    atask = _is_atask(prologue, selected.mode)
-    purpose = _find_section(prologue, SectionRole.PURPOSE, nonempty=True)
-    description = _find_section(prologue, SectionRole.DESCRIPTION, nonempty=True)
+    atask = prologue.resolve_mode(selected.mode) is HlpMode.ATASK
+    purpose = prologue.find_section(SectionRole.PURPOSE, nonempty=True)
+    description = prologue.find_section(SectionRole.DESCRIPTION, nonempty=True)
     invocation = None
     if not atask:
-        invocation = _find_section(prologue, SectionRole.INVOCATION, nonempty=True)
+        invocation = prologue.find_section(SectionRole.INVOCATION, nonempty=True)
 
     required: list[tuple[str, object | None]] = [
         ("Name", prologue.name),
@@ -140,7 +132,7 @@ def render_prologue_hlp(
     output.append("")
 
     if atask:
-        usage = _find_section(prologue, SectionRole.USAGE, nonempty=True)
+        usage = prologue.find_section(SectionRole.USAGE, nonempty=True)
         if usage is not None:
             output.extend(("Usage:", ""))
             output.extend(_render_blocks(usage, indent=3))
@@ -154,7 +146,7 @@ def render_prologue_hlp(
     output.extend(_render_blocks(description, indent=3))
 
     if atask:
-        parameters = _find_section(prologue, SectionRole.ADAM_PARAMETERS, nonempty=True)
+        parameters = prologue.find_section(SectionRole.ADAM_PARAMETERS, nonempty=True)
         if parameters is not None:
             output.extend(
                 (
@@ -167,44 +159,43 @@ def render_prologue_hlp(
                 output.extend((f"3 {_help_key(parameter_name)}", parameter.title))
                 output.extend(_render_blocks(parameter, indent=3))
     else:
-        arguments = _find_section(prologue, SectionRole.ARGUMENTS, nonempty=True)
+        arguments = prologue.find_section(SectionRole.ARGUMENTS, nonempty=True)
         if arguments is not None:
             output.append("2 Arguments")
             output.extend(_render_subsections(arguments, header_indent=0, body_indent=3))
 
-        returned = _find_section(prologue, SectionRole.RETURNED_VALUE, nonempty=True)
+        returned = prologue.find_section(SectionRole.RETURNED_VALUE, nonempty=True)
         if returned is not None:
             output.append("2 Returned_Value")
             output.extend(_render_subsections(returned, header_indent=0, body_indent=3))
 
-    examples = _find_section(prologue, SectionRole.EXAMPLES, nonempty=True)
+    examples = prologue.find_section(SectionRole.EXAMPLES, nonempty=True)
     if examples is not None:
         output.append("2 Examples")
         output.extend(_render_subsections(examples, header_indent=0, body_indent=3))
 
-    notes = _find_section(prologue, SectionRole.NOTES, nonempty=True)
+    notes = prologue.find_section(SectionRole.NOTES, nonempty=True)
     if notes is not None:
         output.append("2 Notes")
         output.extend(_render_blocks(notes, indent=0))
 
     for section in prologue.sections:
-        if section.role in _EXCLUDED_ROLES or not _section_has_content(section):
+        if section.role in _EXCLUDED_ROLES or not section.has_content:
             continue
         output.append(f"2 {_help_key(section.title)}")
         output.extend(_render_section_content(section, indent=3))
 
-    authors = _find_section(prologue, SectionRole.AUTHORS, nonempty=True)
+    authors = prologue.find_section(SectionRole.AUTHORS, nonempty=True)
     if authors is not None:
         output.append("2 Authors")
         output.extend(_render_subsections(authors, header_indent=0, body_indent=3))
 
-    history = _find_section(prologue, SectionRole.HISTORY, nonempty=True)
+    history = prologue.find_section(SectionRole.HISTORY, nonempty=True)
     if history is not None:
         output.append("2 History")
         output.extend(_render_subsections(history, header_indent=1, body_indent=4))
 
-    implementation = _find_section(
-        prologue,
+    implementation = prologue.find_section(
         SectionRole.IMPLEMENTATION_STATUS,
         nonempty=True,
     )
@@ -212,46 +203,12 @@ def render_prologue_hlp(
         output.append("2 Implementation_Status")
         output.extend(_render_blocks(implementation, indent=3))
 
-    bugs = _find_section(prologue, SectionRole.BUGS, nonempty=True)
+    bugs = prologue.find_section(SectionRole.BUGS, nonempty=True)
     if bugs is not None:
         output.append("2 Bugs")
         output.extend(_render_blocks(bugs, indent=3))
 
     return "\n".join(output).rstrip() + "\n"
-
-
-def _is_atask(prologue: Prologue, mode: HlpMode) -> bool:
-    if mode is not HlpMode.AUTO:
-        return mode is HlpMode.ATASK
-    module_type = _find_section(prologue, SectionRole.TYPE_OF_MODULE)
-    if module_type is None:
-        return False
-    normalized = _section_text(module_type).casefold().replace("-", " ")
-    return "a task" in normalized or "atask" in normalized
-
-
-def _find_section(
-    prologue: Prologue,
-    role: SectionRole,
-    *,
-    nonempty: bool = False,
-) -> Section | None:
-    return next(
-        (
-            section
-            for section in prologue.sections
-            if section.role is role and (not nonempty or _section_has_content(section))
-        ),
-        None,
-    )
-
-
-def _section_has_content(section: Section) -> bool:
-    return bool(section.blocks or section.subsections)
-
-
-def _section_text(section: Section) -> str:
-    return "\n".join(line.lstrip() for line in _render_section_content(section, indent=0))
 
 
 def _render_section_content(section: Section, *, indent: int) -> list[str]:

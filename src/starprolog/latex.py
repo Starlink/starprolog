@@ -8,8 +8,7 @@ __all__ = (
     "render_prologue_latex",
 )
 
-from enum import StrEnum
-
+from .models import DocumentationMode as LatexMode
 from .models import (
     FrozenModel,
     ItemListBlock,
@@ -20,14 +19,6 @@ from .models import (
     Section,
     SectionRole,
 )
-
-
-class LatexMode(StrEnum):
-    """Kind of Starlink documentation being rendered."""
-
-    AUTO = "auto"
-    ATASK = "atask"
-    LIBRARY = "library"
 
 
 class LatexOptions(FrozenModel):
@@ -205,8 +196,8 @@ def render_prologue_latex(
     """
     selected = options or LatexOptions()
     name = prologue.name
-    purpose = _find_section(prologue, SectionRole.PURPOSE, nonempty=True)
-    description = _find_section(prologue, SectionRole.DESCRIPTION, nonempty=True)
+    purpose = prologue.find_section(SectionRole.PURPOSE, nonempty=True)
+    description = prologue.find_section(SectionRole.DESCRIPTION, nonempty=True)
     missing = [label for label, value in (("Name", name), ("Purpose", purpose)) if value is None]
     if missing:
         location = f"{prologue.source.path}:{prologue.source.start_line}"
@@ -214,56 +205,59 @@ def render_prologue_latex(
 
     assert name is not None
     assert purpose is not None
-    atask = _is_atask(prologue, selected.mode)
+    atask = prologue.resolve_mode(selected.mode) is LatexMode.ATASK
     body: list[str] = []
     if description is not None:
         body.extend(_render_wrapped_section("sstdescription", description))
 
     usage_role = SectionRole.USAGE if atask else SectionRole.INVOCATION
     usage_macro = "sstusage" if atask else "sstinvocation"
-    usage = _find_section(prologue, usage_role, nonempty=True)
+    usage = prologue.find_section(usage_role, nonempty=True)
     if usage is not None:
         body.extend(_render_wrapped_section(usage_macro, usage))
 
     parameter_role = SectionRole.ADAM_PARAMETERS if atask else SectionRole.ARGUMENTS
     parameter_macro = "sstparameters" if atask else "sstarguments"
-    parameters = _find_section(prologue, parameter_role, nonempty=True)
+    parameters = prologue.find_section(parameter_role, nonempty=True)
     if parameters is not None:
         body.extend(_render_wrapped_section(parameter_macro, parameters, subsections=True))
 
-    applicability = _find_section(prologue, SectionRole.APPLICABILITY, nonempty=True)
+    applicability = prologue.find_section(SectionRole.APPLICABILITY, nonempty=True)
     if applicability is not None:
         body.extend(_render_wrapped_section("sstapplicability", applicability, subsections=True))
 
     if not atask:
-        returned = _find_section(prologue, SectionRole.RETURNED_VALUE, nonempty=True)
+        returned = prologue.find_section(SectionRole.RETURNED_VALUE, nonempty=True)
         if returned is not None:
             body.extend(_render_wrapped_section("sstreturnedvalue", returned, subsections=True))
 
-    examples = _find_section(prologue, SectionRole.EXAMPLES, nonempty=True)
+    examples = prologue.find_section(SectionRole.EXAMPLES, nonempty=True)
     if examples is not None:
         body.extend(_render_wrapped_section("sstexamples", examples, subsections=True, examples=True))
 
-    notes = _find_section(prologue, SectionRole.NOTES, nonempty=True)
+    notes = prologue.find_section(SectionRole.NOTES, nonempty=True)
     if notes is not None:
         body.extend(_render_wrapped_section("sstnotes", notes))
 
     for section in prologue.sections:
         if section.role in _EXCLUDED_ROLES or section.role in _SPECIAL_ROLES:
             continue
-        if not _section_has_content(section):
+        if not section.has_content:
             continue
         body.extend(_render_diy_section(section, subsections=bool(section.subsections)))
 
-    implementation = _find_section(prologue, SectionRole.IMPLEMENTATION_STATUS, nonempty=True)
+    implementation = prologue.find_section(
+        SectionRole.IMPLEMENTATION_STATUS,
+        nonempty=True,
+    )
     if implementation is not None:
         body.extend(_render_wrapped_section("sstimplementationstatus", implementation))
 
-    bugs = _find_section(prologue, SectionRole.BUGS, nonempty=True)
+    bugs = prologue.find_section(SectionRole.BUGS, nonempty=True)
     if bugs is not None:
         body.extend(_render_wrapped_section("sstbugs", bugs))
 
-    purpose_text = _section_text(purpose).rstrip()
+    purpose_text = purpose.plain_text().rstrip()
     if purpose_text.endswith("."):
         purpose_text = purpose_text[:-1]
     lines = [r"\sstroutine{", f"   {escape_latex(name)}", "}{"]
@@ -272,51 +266,6 @@ def render_prologue_latex(
     lines.extend(body)
     lines.append("}")
     return "\n".join(lines) + "\n"
-
-
-def _is_atask(prologue: Prologue, mode: LatexMode) -> bool:
-    if mode is not LatexMode.AUTO:
-        return mode is LatexMode.ATASK
-    module_type = _find_section(prologue, SectionRole.TYPE_OF_MODULE)
-    if module_type is None:
-        return False
-    normalized = _section_text(module_type).casefold().replace("-", " ")
-    return "a task" in normalized or "atask" in normalized
-
-
-def _find_section(
-    prologue: Prologue,
-    role: SectionRole,
-    *,
-    nonempty: bool = False,
-) -> Section | None:
-    return next(
-        (
-            section
-            for section in prologue.sections
-            if section.role is role and (not nonempty or _section_has_content(section))
-        ),
-        None,
-    )
-
-
-def _section_has_content(section: Section) -> bool:
-    return bool(section.blocks or section.subsections)
-
-
-def _section_text(section: Section) -> str:
-    lines: list[str] = []
-    for block in section.blocks:
-        if isinstance(block, ParagraphBlock):
-            if lines:
-                lines.append("")
-            lines.extend(block.lines)
-        elif isinstance(block, ItemListBlock):
-            for item in block.items:
-                lines.extend(item.lines)
-        elif isinstance(block, LineBlock):
-            lines.extend(block.lines)
-    return "\n".join(lines)
 
 
 def _render_wrapped_section(

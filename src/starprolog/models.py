@@ -5,6 +5,7 @@ __all__ = (
     "CollectionMetadata",
     "Diagnostic",
     "DiagnosticSeverity",
+    "DocumentationMode",
     "InputFormat",
     "InputLanguage",
     "ItemListBlock",
@@ -63,6 +64,14 @@ class DiagnosticSeverity(StrEnum):
 
     WARNING = "warning"
     ERROR = "error"
+
+
+class DocumentationMode(StrEnum):
+    """Kind of Starlink documentation represented by a prologue."""
+
+    AUTO = "auto"
+    ATASK = "atask"
+    LIBRARY = "library"
 
 
 class PrologueKind(StrEnum):
@@ -182,6 +191,45 @@ class Section(FrozenModel):
     blocks: tuple[Block, ...] = ()
     subsections: tuple[Section, ...] = ()
 
+    @property
+    def has_content(self) -> bool:
+        """Whether this section contains blocks or subsections.
+
+        Returns
+        -------
+        has_content : `bool`
+            `True` when the section contains parsed content.
+        """
+        return bool(self.blocks or self.subsections)
+
+    def plain_text(self) -> str:
+        """Flatten the section content into unescaped plain text.
+
+        Returns
+        -------
+        text : `str`
+            Source-wrapped text with blank lines between paragraph blocks.
+        """
+        lines: list[str] = []
+        for block in self.blocks:
+            if isinstance(block, ParagraphBlock):
+                if lines:
+                    lines.append("")
+                lines.extend(block.lines)
+            elif isinstance(block, ItemListBlock):
+                for item in block.items:
+                    lines.extend(item.lines)
+            elif isinstance(block, LineBlock):
+                lines.extend(block.lines)
+        for subsection in self.subsections:
+            if lines:
+                lines.append("")
+            lines.append(subsection.title)
+            text = subsection.plain_text()
+            if text:
+                lines.extend(text.splitlines())
+        return "\n".join(lines)
+
 
 class Prologue(FrozenModel):
     """One parsed source-code prologue."""
@@ -191,6 +239,74 @@ class Prologue(FrozenModel):
     marker: PrologueMarker
     source: SourceSpan
     sections: tuple[Section, ...]
+
+    def find_section(
+        self,
+        role: SectionRole,
+        *,
+        nonempty: bool = False,
+    ) -> Section | None:
+        """Find the first section with a given semantic role.
+
+        Parameters
+        ----------
+        role
+            Semantic role to locate.
+        nonempty
+            If `True`, ignore sections without blocks or subsections.
+
+        Returns
+        -------
+        section : `Section` or `None`
+            Matching section, or `None` if no suitable section exists.
+        """
+        return next(
+            (
+                section
+                for section in self.sections
+                if section.role is role and (not nonempty or section.has_content)
+            ),
+            None,
+        )
+
+    @property
+    def inferred_mode(self) -> DocumentationMode:
+        """Infer whether this is an A-task or library prologue.
+
+        Returns
+        -------
+        mode : `DocumentationMode`
+            Inferred documentation mode. Prologues not explicitly identified
+            as A-tasks are treated as library routines.
+        """
+        module_type = self.find_section(SectionRole.TYPE_OF_MODULE)
+        if module_type is None:
+            return DocumentationMode.LIBRARY
+        normalized = module_type.plain_text().casefold().replace("-", " ")
+        if "a task" in normalized or "atask" in normalized:
+            return DocumentationMode.ATASK
+        return DocumentationMode.LIBRARY
+
+    def resolve_mode(
+        self,
+        requested: DocumentationMode = DocumentationMode.AUTO,
+    ) -> DocumentationMode:
+        """Resolve an explicit or automatic documentation mode.
+
+        Parameters
+        ----------
+        requested
+            Requested mode. `DocumentationMode.AUTO` selects the mode inferred
+            from the prologue.
+
+        Returns
+        -------
+        mode : `DocumentationMode`
+            Effective A-task or library mode.
+        """
+        if requested is DocumentationMode.AUTO:
+            return self.inferred_mode
+        return requested
 
 
 class CollectionMetadata(FrozenModel):

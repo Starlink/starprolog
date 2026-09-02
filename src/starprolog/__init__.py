@@ -6,6 +6,7 @@ __all__ = (
     "AstPrepResult",
     "Diagnostic",
     "DiagnosticSeverity",
+    "DocumentationMode",
     "HlpMode",
     "HlpOptions",
     "InputFormat",
@@ -49,6 +50,7 @@ from .latex import LatexMode, LatexOptions, escape_latex, render_latex, render_p
 from .models import (
     Diagnostic,
     DiagnosticSeverity,
+    DocumentationMode,
     InputFormat,
     InputLanguage,
     ItemListBlock,

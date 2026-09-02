@@ -5,7 +5,17 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from starprolog import InputFormat, PrologueCollection, SourceSpan, parse_paths, parse_text
+from starprolog import (
+    DocumentationMode,
+    HlpMode,
+    InputFormat,
+    LatexMode,
+    PrologueCollection,
+    SectionRole,
+    SourceSpan,
+    parse_paths,
+    parse_text,
+)
 
 
 def test_collection_json_round_trip() -> None:
@@ -45,3 +55,29 @@ def test_multiple_json_collections_are_combined(tmp_path: Path) -> None:
     assert [prologue.name for prologue in combined.prologues] == ["FIRST", "SECOND"]
     assert combined.metadata.input_format is InputFormat.JSON
     assert combined.metadata.source_count == 2
+
+
+def test_ir_section_navigation_and_mode_inference() -> None:
+    """Shared document semantics are available directly from the IR."""
+    collection = parse_text(
+        "*+\n*  Name:\n*     TASK\n*  Purpose:\n*     First line.\n"
+        "*\n*     Second paragraph.\n*  Type of Module:\n*     ADAM A-task\n"
+        "*  Bugs:\n*     {note_any_bugs_here}\n*-\n"
+    )
+    prologue = collection.prologues[0]
+
+    purpose = prologue.find_section(SectionRole.PURPOSE, nonempty=True)
+    assert purpose is not None
+    assert purpose.has_content
+    assert purpose.plain_text() == "First line.\n\nSecond paragraph."
+    assert prologue.find_section(SectionRole.BUGS) is not None
+    assert prologue.find_section(SectionRole.BUGS, nonempty=True) is None
+    assert prologue.inferred_mode is DocumentationMode.ATASK
+    assert prologue.resolve_mode() is DocumentationMode.ATASK
+    assert prologue.resolve_mode(DocumentationMode.LIBRARY) is DocumentationMode.LIBRARY
+
+
+def test_renderer_mode_names_are_compatibility_aliases() -> None:
+    """Both renderer APIs expose the shared documentation mode enum."""
+    assert LatexMode is DocumentationMode
+    assert HlpMode is DocumentationMode
