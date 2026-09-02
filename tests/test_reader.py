@@ -190,3 +190,15 @@ def test_tab_indented_body_does_not_hide_section_headings() -> None:
         SectionRole.PURPOSE,
         SectionRole.HISTORY,
     ]
+
+
+def test_double_hyphen_text_is_not_an_item() -> None:
+    """Double-hyphen prose is retained rather than parsed as a list item."""
+    collection = parse_text(
+        "*+\n*  Name:\n*     DASHES\n*  Purpose:\n*     Test dashes.\n"
+        "*  Description:\n*     -- VALUE=0 retains its meaning.\n*-\n"
+    )
+
+    description = collection.prologues[0].sections[2]
+    assert isinstance(description.blocks[0], ParagraphBlock)
+    assert description.blocks[0].lines == ("-- VALUE=0 retains its meaning.",)

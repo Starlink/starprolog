@@ -31,8 +31,51 @@ def test_main_help_lists_parse_command() -> None:
 
     assert result.exit_code == 0
     assert "astprep" in result.output
+    assert "hlp" in result.output
     assert "parse" in result.output
     assert "latex" in result.output
+
+
+def test_json_ir_can_be_replayed_by_renderers(tmp_path: Path) -> None:
+    """LaTeX and HLP renderers can consume a serialized Pydantic IR."""
+    runner = CliRunner()
+    source = tmp_path / "source.f"
+    intermediate = tmp_path / "prologues.json"
+    source.write_text(
+        "*+\n*  Name:\n*     REPLAY\n*  Purpose:\n*     Test replay.\n"
+        "*  Invocation:\n*     CALL REPLAY\n*  Description:\n*     Replay JSON.\n*-\n",
+        encoding="utf-8",
+    )
+
+    parsed = runner.invoke(main, ["parse", str(source), "-o", str(intermediate)])
+    latex = runner.invoke(
+        main,
+        ["latex", "--input-format", "json", str(intermediate)],
+    )
+    hlp = runner.invoke(
+        main,
+        ["hlp", "--input-format", "json", str(intermediate)],
+    )
+
+    assert parsed.exit_code == 0, parsed.output
+    assert latex.exit_code == 0, latex.output
+    assert "REPLAY" in latex.output
+    assert hlp.exit_code == 0, hlp.output
+    assert hlp.output.startswith("1 REPLAY\n")
+
+
+def test_invalid_json_ir_is_reported_cleanly(tmp_path: Path) -> None:
+    """Invalid serialized input produces a clean Click error."""
+    intermediate = tmp_path / "bad.json"
+    intermediate.write_text('{"schema_version": 99}', encoding="utf-8")
+
+    result = CliRunner().invoke(
+        main,
+        ["hlp", "--input-format", "json", str(intermediate)],
+    )
+
+    assert result.exit_code != 0
+    assert "invalid starprolog JSON" in result.output
 
 
 def test_latex_command_writes_fragment(tmp_path: Path) -> None:

@@ -8,9 +8,14 @@ from typing import TextIO
 import click
 
 from .astprep import AstEntityKind, AstPrepOptions, prepare_ast, render_ast_latex
+from .hlp import HlpMode, HlpOptions, render_hlp
 from .latex import LatexMode, LatexOptions, render_latex
-from .models import InputFormat, InputLanguage
+from .models import InputFormat, InputLanguage, PrologueCollection
 from .reader import parse_paths
+
+_INPUT_FORMAT_HELP = (
+    "Detect STARLSE and old ADAM/SSE prologues, select one source format, or load serialized JSON."
+)
 
 
 @click.group(name="starprolog", context_settings={"help_option_names": ["-h", "--help"]})
@@ -30,7 +35,7 @@ def main() -> None:
     type=click.Choice([input_format.value for input_format in InputFormat], case_sensitive=False),
     default=InputFormat.AUTO.value,
     show_default=True,
-    help="Detect STARLSE and old ADAM/SSE prologues, or select one format.",
+    help=_INPUT_FORMAT_HELP,
 )
 @click.option(
     "--language",
@@ -56,7 +61,7 @@ def parse_command(
     compact: bool,
 ) -> None:
     """Parse INPUTS and write the renderer-independent JSON model."""
-    collection = parse_paths(
+    collection = _read_inputs(
         inputs,
         language=InputLanguage(language.casefold()),
         input_format=InputFormat(input_format.casefold()),
@@ -78,7 +83,7 @@ def parse_command(
     type=click.Choice([input_format.value for input_format in InputFormat], case_sensitive=False),
     default=InputFormat.AUTO.value,
     show_default=True,
-    help="Detect STARLSE and old ADAM/SSE prologues, or select one format.",
+    help=_INPUT_FORMAT_HELP,
 )
 @click.option(
     "--language",
@@ -124,7 +129,7 @@ def latex_command(
     output: TextIO,
 ) -> None:
     """Render prologues from INPUTS as Starlink-compatible LaTeX."""
-    collection = parse_paths(
+    collection = _read_inputs(
         inputs,
         language=InputLanguage(language.casefold()),
         input_format=InputFormat(input_format.casefold()),
@@ -136,6 +141,66 @@ def latex_command(
     )
     try:
         output.write(render_latex(collection, options=options))
+    except ValueError as error:
+        raise click.ClickException(str(error)) from error
+
+
+@main.command(name="hlp")
+@click.argument(
+    "inputs",
+    nargs=-1,
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option(
+    "--input-format",
+    type=click.Choice([input_format.value for input_format in InputFormat], case_sensitive=False),
+    default=InputFormat.AUTO.value,
+    show_default=True,
+    help=_INPUT_FORMAT_HELP,
+)
+@click.option(
+    "--language",
+    type=click.Choice([language.value for language in InputLanguage], case_sensitive=False),
+    default=InputLanguage.ALL.value,
+    show_default=True,
+    help="Select language-specific lines in AST-style public prologues.",
+)
+@click.option(
+    "--mode",
+    type=click.Choice([mode.value for mode in HlpMode], case_sensitive=False),
+    default=HlpMode.AUTO.value,
+    show_default=True,
+    help="Render an A-task, a library routine, or infer the mode from each prologue.",
+)
+@click.option(
+    "-o",
+    "--output",
+    type=click.File(mode="w", encoding="utf-8", lazy=True),
+    default="-",
+    show_default="standard output",
+    help="Write Starlink help-library source to this file.",
+)
+def hlp_command(
+    inputs: tuple[Path, ...],
+    input_format: str,
+    language: str,
+    mode: str,
+    output: TextIO,
+) -> None:
+    """Render prologues from INPUTS as Starlink help-library source."""
+    collection = _read_inputs(
+        inputs,
+        language=InputLanguage(language.casefold()),
+        input_format=InputFormat(input_format.casefold()),
+    )
+    try:
+        output.write(
+            render_hlp(
+                collection,
+                options=HlpOptions(mode=HlpMode(mode.casefold())),
+            )
+        )
     except ValueError as error:
         raise click.ClickException(str(error)) from error
 
@@ -216,3 +281,19 @@ def astprep_command(
         output.write("\n")
     else:
         output.write(render_ast_latex(prepared))
+
+
+def _read_inputs(
+    inputs: tuple[Path, ...],
+    *,
+    language: InputLanguage,
+    input_format: InputFormat,
+) -> PrologueCollection:
+    try:
+        return parse_paths(
+            inputs,
+            language=language,
+            input_format=input_format,
+        )
+    except (OSError, ValueError) as error:
+        raise click.ClickException(str(error)) from error

@@ -107,7 +107,7 @@ def parse_paths(
     language: InputLanguage = InputLanguage.ALL,
     input_format: InputFormat = InputFormat.AUTO,
 ) -> PrologueCollection:
-    """Parse Starlink prologues from source files.
+    """Parse Starlink prologues or load serialized collections.
 
     Parameters
     ----------
@@ -116,7 +116,8 @@ def parse_paths(
     language
         Language-specific lines to retain in AST-style public prologues.
     input_format
-        Source-prologue format to detect and parse.
+        Source-prologue format to detect and parse, or JSON for serialized
+        intermediate representations.
 
     Returns
     -------
@@ -124,6 +125,9 @@ def parse_paths(
         Parsed prologues and any non-fatal diagnostics.
     """
     path_list = tuple(paths)
+    if input_format is InputFormat.JSON:
+        return _load_json_paths(path_list)
+
     prologues: list[Prologue] = []
     diagnostics: list[Diagnostic] = []
     options = ReaderOptions(language=language, input_format=input_format)
@@ -164,7 +168,7 @@ def parse_text(
     language: InputLanguage = InputLanguage.ALL,
     input_format: InputFormat = InputFormat.AUTO,
 ) -> PrologueCollection:
-    """Parse Starlink prologues from an in-memory source string.
+    """Parse a prologue source or serialized collection from a string.
 
     Parameters
     ----------
@@ -175,13 +179,29 @@ def parse_text(
     language
         Language-specific lines to retain in AST-style public prologues.
     input_format
-        Source-prologue format to detect and parse.
+        Source-prologue format to detect and parse, or JSON for a serialized
+        intermediate representation.
 
     Returns
     -------
     collection : `PrologueCollection`
         Parsed prologues and any non-fatal diagnostics.
     """
+    if input_format is InputFormat.JSON:
+        try:
+            collection = PrologueCollection.model_validate_json(text)
+        except ValueError as error:
+            raise ValueError(f"{source}: invalid starprolog JSON: {error}") from error
+        return collection.model_copy(
+            update={
+                "metadata": CollectionMetadata(
+                    language=collection.metadata.language,
+                    input_format=InputFormat.JSON,
+                    source_count=1,
+                )
+            }
+        )
+
     prologues, diagnostics = _parse_source(
         text,
         source,
@@ -195,6 +215,27 @@ def parse_text(
         ),
         prologues=tuple(prologues),
         diagnostics=tuple(diagnostics),
+    )
+
+
+def _load_json_paths(paths: Sequence[Path]) -> PrologueCollection:
+    collections: list[PrologueCollection] = []
+    for path in paths:
+        try:
+            collections.append(PrologueCollection.model_validate_json(path.read_bytes()))
+        except ValueError as error:
+            raise ValueError(f"{path}: invalid starprolog JSON: {error}") from error
+
+    languages = {collection.metadata.language for collection in collections}
+    language = languages.pop() if len(languages) == 1 else InputLanguage.ALL
+    return PrologueCollection(
+        metadata=CollectionMetadata(
+            language=language,
+            input_format=InputFormat.JSON,
+            source_count=len(paths),
+        ),
+        prologues=tuple(prologue for collection in collections for prologue in collection.prologues),
+        diagnostics=tuple(diagnostic for collection in collections for diagnostic in collection.diagnostics),
     )
 
 
@@ -579,7 +620,7 @@ def _parse_ordinary_blocks(lines: Sequence[LocatedLine], source: str) -> list[Bl
 
         for line in dedented:
             stripped = line.text.lstrip()
-            if stripped.startswith("-") and stripped != "---":
+            if stripped.startswith("-") and not stripped.startswith("--"):
                 flush_paragraph()
                 flush_item()
                 item_text = stripped[1:]

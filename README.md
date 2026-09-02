@@ -1,9 +1,9 @@
 # starprolog
 
 `starprolog` parses Starlink-style source-code prologues into a
-renderer-independent document tree. The command-line interface will provide
+renderer-independent document tree. The command-line interface provides
 LaTeX and Starlink help-library renderers. The intermediate representation
-can also be written as JSON for inspection and use by other tools.
+can also be written as JSON for inspection, storage, and later rendering.
 
 The implementation is independent of the legacy Starlink SST implementation
 and does not require a Starlink software installation.
@@ -38,6 +38,27 @@ Use `--document` to include portable definitions of the SST macros and emit a
 complete LaTeX document. `--mode auto` distinguishes ADAM A-tasks from library
 routines using each prologue's `Type of Module` section; it can be overridden
 with `--mode atask` or `--mode library`.
+
+Render source for the Starlink help-library compiler with:
+
+```sh
+starprolog hlp --mode library source.f source.c -o routines.hlp
+```
+
+The HLP renderer implements the topic structure and required-section checks
+of SST `prohlp`. In auto mode it uses the same A-task detection as the LaTeX
+renderer.
+
+Both renderers can consume the serialized Pydantic intermediate
+representation instead of reparsing source:
+
+```sh
+starprolog parse source.f -o prologues.json
+starprolog latex --input-format json prologues.json -o routines.tex
+starprolog hlp --input-format json prologues.json -o routines.hlp
+```
+
+Multiple JSON collections can be supplied and are rendered in input order.
 
 The explicitly AST-specific `astprep` command replaces the documentation
 preprocessing performed by AST's historical `getatt` Perl script. For example:

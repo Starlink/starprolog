@@ -6,6 +6,8 @@ __all__ = (
     "AstPrepResult",
     "Diagnostic",
     "DiagnosticSeverity",
+    "HlpMode",
+    "HlpOptions",
     "InputFormat",
     "InputLanguage",
     "ItemListBlock",
@@ -28,7 +30,9 @@ __all__ = (
     "parse_text",
     "prepare_ast",
     "render_ast_latex",
+    "render_hlp",
     "render_latex",
+    "render_prologue_hlp",
     "render_prologue_latex",
 )
 
@@ -40,6 +44,7 @@ from .astprep import (
     prepare_ast,
     render_ast_latex,
 )
+from .hlp import HlpMode, HlpOptions, render_hlp, render_prologue_hlp
 from .latex import LatexMode, LatexOptions, escape_latex, render_latex, render_prologue_latex
 from .models import (
     Diagnostic,

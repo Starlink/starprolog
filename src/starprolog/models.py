@@ -42,11 +42,12 @@ class InputLanguage(StrEnum):
 
 
 class InputFormat(StrEnum):
-    """Source-prologue format selected for input parsing."""
+    """Source-prologue or serialized IR format selected for input."""
 
     AUTO = "auto"
     STARLSE = "starlse"
     ADAMSSE = "adamsse"
+    JSON = "json"
 
 
 class PrologueSyntax(StrEnum):
