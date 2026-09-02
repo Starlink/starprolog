@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from starprolog import LatexMode, LatexOptions, escape_latex, parse_text, render_latex
+from starprolog import DocumentationMode, LatexOptions, escape_latex, parse_text, render_latex
 
 
 def test_escape_latex_uses_sst_conventions() -> None:
@@ -103,7 +103,7 @@ def test_mode_can_override_inferred_atask() -> None:
 """
     )
 
-    result = render_latex(collection, options=LatexOptions(mode=LatexMode.LIBRARY))
+    result = render_latex(collection, options=LatexOptions(mode=DocumentationMode.LIBRARY))
 
     assert "\\sstinvocation{" in result
 

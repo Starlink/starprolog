@@ -8,9 +8,9 @@ from typing import TextIO
 import click
 
 from .astprep import AstEntityKind, AstPrepOptions, prepare_ast, render_ast_latex
-from .hlp import HlpMode, HlpOptions, render_hlp
-from .latex import LatexMode, LatexOptions, render_latex
-from .models import InputFormat, InputLanguage, PrologueCollection
+from .hlp import HlpOptions, render_hlp
+from .latex import LatexOptions, render_latex
+from .models import DocumentationMode, InputFormat, InputLanguage, PrologueCollection
 from .reader import parse_paths
 
 _INPUT_FORMAT_HELP = (
@@ -94,8 +94,8 @@ def parse_command(
 )
 @click.option(
     "--mode",
-    type=click.Choice([mode.value for mode in LatexMode], case_sensitive=False),
-    default=LatexMode.AUTO.value,
+    type=click.Choice([mode.value for mode in DocumentationMode], case_sensitive=False),
+    default=DocumentationMode.AUTO.value,
     show_default=True,
     help="Render an A-task, a library routine, or infer the mode from each prologue.",
 )
@@ -135,7 +135,7 @@ def latex_command(
         input_format=InputFormat(input_format.casefold()),
     )
     options = LatexOptions(
-        mode=LatexMode(mode.casefold()),
+        mode=DocumentationMode(mode.casefold()),
         document=document,
         page_breaks=page_breaks,
     )
@@ -168,8 +168,8 @@ def latex_command(
 )
 @click.option(
     "--mode",
-    type=click.Choice([mode.value for mode in HlpMode], case_sensitive=False),
-    default=HlpMode.AUTO.value,
+    type=click.Choice([mode.value for mode in DocumentationMode], case_sensitive=False),
+    default=DocumentationMode.AUTO.value,
     show_default=True,
     help="Render an A-task, a library routine, or infer the mode from each prologue.",
 )
@@ -198,7 +198,7 @@ def hlp_command(
         output.write(
             render_hlp(
                 collection,
-                options=HlpOptions(mode=HlpMode(mode.casefold())),
+                options=HlpOptions(mode=DocumentationMode(mode.casefold())),
             )
         )
     except ValueError as error:

@@ -7,12 +7,10 @@ __all__ = (
     "Diagnostic",
     "DiagnosticSeverity",
     "DocumentationMode",
-    "HlpMode",
     "HlpOptions",
     "InputFormat",
     "InputLanguage",
     "ItemListBlock",
-    "LatexMode",
     "LatexOptions",
     "LineBlock",
     "ListItem",
@@ -45,8 +43,8 @@ from .astprep import (
     prepare_ast,
     render_ast_latex,
 )
-from .hlp import HlpMode, HlpOptions, render_hlp, render_prologue_hlp
-from .latex import LatexMode, LatexOptions, escape_latex, render_latex, render_prologue_latex
+from .hlp import HlpOptions, render_hlp, render_prologue_hlp
+from .latex import LatexOptions, escape_latex, render_latex, render_prologue_latex
 from .models import (
     Diagnostic,
     DiagnosticSeverity,

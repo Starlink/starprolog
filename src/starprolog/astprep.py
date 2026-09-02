@@ -14,12 +14,13 @@ from typing import Literal
 
 from pydantic import model_validator
 
-from .latex import LatexMode, LatexOptions, render_latex
+from .latex import LatexOptions, render_latex
 from .models import (
     Block,
     CollectionMetadata,
     Diagnostic,
     DiagnosticSeverity,
+    DocumentationMode,
     FrozenModel,
     InputLanguage,
     ParagraphBlock,
@@ -172,7 +173,7 @@ def render_ast_latex(result: AstPrepResult) -> str:
     """
     latex = render_latex(
         result.collection,
-        options=LatexOptions(mode=LatexMode.LIBRARY),
+        options=LatexOptions(mode=DocumentationMode.LIBRARY),
     )
     if result.options.unix_script:
         return latex

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from starprolog import HlpMode, HlpOptions, parse_text, render_hlp
+from starprolog import DocumentationMode, HlpOptions, parse_text, render_hlp
 
 
 def test_render_library_help() -> None:
@@ -110,7 +110,7 @@ def test_mode_can_override_inferred_library() -> None:
 """
     )
 
-    result = render_hlp(collection, options=HlpOptions(mode=HlpMode.ATASK))
+    result = render_hlp(collection, options=HlpOptions(mode=DocumentationMode.ATASK))
 
     assert result.startswith("1 TASK\n")
 

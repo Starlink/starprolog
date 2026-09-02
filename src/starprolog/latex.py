@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 __all__ = (
-    "LatexMode",
     "LatexOptions",
     "escape_latex",
     "render_latex",
     "render_prologue_latex",
 )
 
-from .models import DocumentationMode as LatexMode
 from .models import (
+    DocumentationMode,
     FrozenModel,
     ItemListBlock,
     LineBlock,
@@ -24,7 +23,7 @@ from .models import (
 class LatexOptions(FrozenModel):
     """Options controlling LaTeX rendering."""
 
-    mode: LatexMode = LatexMode.AUTO
+    mode: DocumentationMode = DocumentationMode.AUTO
     document: bool = False
     page_breaks: bool = False
 
@@ -205,7 +204,7 @@ def render_prologue_latex(
 
     assert name is not None
     assert purpose is not None
-    atask = prologue.resolve_mode(selected.mode) is LatexMode.ATASK
+    atask = prologue.resolve_mode(selected.mode) is DocumentationMode.ATASK
     body: list[str] = []
     if description is not None:
         body.extend(_render_wrapped_section("sstdescription", description))

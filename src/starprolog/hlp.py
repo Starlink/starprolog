@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 __all__ = (
-    "HlpMode",
     "HlpOptions",
     "render_hlp",
     "render_prologue_hlp",
@@ -9,8 +8,8 @@ __all__ = (
 
 import re
 
-from .models import DocumentationMode as HlpMode
 from .models import (
+    DocumentationMode,
     FrozenModel,
     ItemListBlock,
     LineBlock,
@@ -25,7 +24,7 @@ from .models import (
 class HlpOptions(FrozenModel):
     """Options controlling Starlink help-library rendering."""
 
-    mode: HlpMode = HlpMode.AUTO
+    mode: DocumentationMode = DocumentationMode.AUTO
 
 
 _EXCLUDED_ROLES = {
@@ -101,7 +100,7 @@ def render_prologue_hlp(
         contract is absent.
     """
     selected = options or HlpOptions()
-    atask = prologue.resolve_mode(selected.mode) is HlpMode.ATASK
+    atask = prologue.resolve_mode(selected.mode) is DocumentationMode.ATASK
     purpose = prologue.find_section(SectionRole.PURPOSE, nonempty=True)
     description = prologue.find_section(SectionRole.DESCRIPTION, nonempty=True)
     invocation = None

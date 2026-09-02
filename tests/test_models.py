@@ -7,9 +7,7 @@ from pydantic import ValidationError
 
 from starprolog import (
     DocumentationMode,
-    HlpMode,
     InputFormat,
-    LatexMode,
     PrologueCollection,
     SectionRole,
     SourceSpan,
@@ -75,9 +73,3 @@ def test_ir_section_navigation_and_mode_inference() -> None:
     assert prologue.inferred_mode is DocumentationMode.ATASK
     assert prologue.resolve_mode() is DocumentationMode.ATASK
     assert prologue.resolve_mode(DocumentationMode.LIBRARY) is DocumentationMode.LIBRARY
-
-
-def test_renderer_mode_names_are_compatibility_aliases() -> None:
-    """Both renderer APIs expose the shared documentation mode enum."""
-    assert LatexMode is DocumentationMode
-    assert HlpMode is DocumentationMode
