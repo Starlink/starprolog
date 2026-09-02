@@ -9,7 +9,7 @@ import click
 
 from .astprep import AstEntityKind, AstPrepOptions, prepare_ast, render_ast_latex
 from .latex import LatexMode, LatexOptions, render_latex
-from .models import InputLanguage
+from .models import InputFormat, InputLanguage
 from .reader import parse_paths
 
 
@@ -24,6 +24,13 @@ def main() -> None:
     nargs=-1,
     required=True,
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option(
+    "--input-format",
+    type=click.Choice([input_format.value for input_format in InputFormat], case_sensitive=False),
+    default=InputFormat.AUTO.value,
+    show_default=True,
+    help="Detect STARLSE and old ADAM/SSE prologues, or select one format.",
 )
 @click.option(
     "--language",
@@ -41,9 +48,19 @@ def main() -> None:
     help="Write the Pydantic intermediate representation as JSON.",
 )
 @click.option("--compact", is_flag=True, help="Write JSON without indentation.")
-def parse_command(inputs: tuple[Path, ...], language: str, output: TextIO, compact: bool) -> None:
+def parse_command(
+    inputs: tuple[Path, ...],
+    input_format: str,
+    language: str,
+    output: TextIO,
+    compact: bool,
+) -> None:
     """Parse INPUTS and write the renderer-independent JSON model."""
-    collection = parse_paths(inputs, language=InputLanguage(language.casefold()))
+    collection = parse_paths(
+        inputs,
+        language=InputLanguage(language.casefold()),
+        input_format=InputFormat(input_format.casefold()),
+    )
     indent = None if compact else 2
     output.write(collection.model_dump_json(indent=indent))
     output.write("\n")
@@ -55,6 +72,13 @@ def parse_command(inputs: tuple[Path, ...], language: str, output: TextIO, compa
     nargs=-1,
     required=True,
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option(
+    "--input-format",
+    type=click.Choice([input_format.value for input_format in InputFormat], case_sensitive=False),
+    default=InputFormat.AUTO.value,
+    show_default=True,
+    help="Detect STARLSE and old ADAM/SSE prologues, or select one format.",
 )
 @click.option(
     "--language",
@@ -92,6 +116,7 @@ def parse_command(inputs: tuple[Path, ...], language: str, output: TextIO, compa
 )
 def latex_command(
     inputs: tuple[Path, ...],
+    input_format: str,
     language: str,
     mode: str,
     document: bool,
@@ -99,7 +124,11 @@ def latex_command(
     output: TextIO,
 ) -> None:
     """Render prologues from INPUTS as Starlink-compatible LaTeX."""
-    collection = parse_paths(inputs, language=InputLanguage(language.casefold()))
+    collection = parse_paths(
+        inputs,
+        language=InputLanguage(language.casefold()),
+        input_format=InputFormat(input_format.casefold()),
+    )
     options = LatexOptions(
         mode=LatexMode(mode.casefold()),
         document=document,
@@ -173,7 +202,11 @@ def astprep_command(
         language=InputLanguage(language.casefold()),
         unix_script=unix_script,
     )
-    collection = parse_paths(inputs, language=options.language)
+    collection = parse_paths(
+        inputs,
+        language=options.language,
+        input_format=InputFormat.STARLSE,
+    )
     prepared = prepare_ast(collection, options=options)
     if labels is not None:
         label_text = "".join(f"{label}\n" for label in prepared.labels)

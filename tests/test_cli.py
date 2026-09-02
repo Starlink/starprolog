@@ -52,6 +52,25 @@ def test_latex_command_writes_fragment(tmp_path: Path) -> None:
     assert "\\sstinvocation{" in result.output
 
 
+def test_latex_command_auto_detects_old_adamsse_input(tmp_path: Path) -> None:
+    """The LaTeX command renders an auto-detected legacy prologue."""
+    runner = CliRunner()
+    source = tmp_path / "old.f"
+    source.write_text(
+        "*+ OLD_DEMO - Test legacy input\n"
+        "*    Description :\n"
+        "*     Exercise automatic input detection.\n"
+        "*    Type Definitions :\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(main, ["latex", str(source)])
+
+    assert result.exit_code == 0, result.output
+    assert "OLD\\_DEMO" in result.output
+    assert "automatic input detection" in result.output
+
+
 def test_astprep_command_writes_latex_and_labels(tmp_path: Path) -> None:
     """The AST extension writes transformed LaTeX and escaped labels."""
     runner = CliRunner()

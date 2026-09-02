@@ -128,6 +128,7 @@ def prepare_ast(collection: PrologueCollection, *, options: AstPrepOptions) -> A
     prepared_collection = PrologueCollection(
         metadata=CollectionMetadata(
             language=options.language,
+            input_format=collection.metadata.input_format,
             source_count=collection.metadata.source_count,
         ),
         prologues=prologues,
@@ -197,6 +198,7 @@ def _transform_prologue(prologue: Prologue, options: AstPrepOptions) -> Prologue
         sections.append(transformed)
     return Prologue(
         name=prologue.name,
+        syntax=prologue.syntax,
         marker=prologue.marker,
         source=prologue.source,
         sections=tuple(sections),

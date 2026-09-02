@@ -5,6 +5,7 @@ __all__ = (
     "CollectionMetadata",
     "Diagnostic",
     "DiagnosticSeverity",
+    "InputFormat",
     "InputLanguage",
     "ItemListBlock",
     "LineBlock",
@@ -14,6 +15,7 @@ __all__ = (
     "PrologueCollection",
     "PrologueKind",
     "PrologueMarker",
+    "PrologueSyntax",
     "Section",
     "SectionRole",
     "SourceSpan",
@@ -37,6 +39,22 @@ class InputLanguage(StrEnum):
     ALL = "all"
     C = "c"
     FORTRAN = "fortran"
+
+
+class InputFormat(StrEnum):
+    """Source-prologue format selected for input parsing."""
+
+    AUTO = "auto"
+    STARLSE = "starlse"
+    ADAMSSE = "adamsse"
+
+
+class PrologueSyntax(StrEnum):
+    """Concrete source syntax detected for one prologue."""
+
+    STARLSE = "starlse"
+    ADAMSSE_FORTRAN = "adamsse-fortran"
+    ADAMSSE_C = "adamsse-c"
 
 
 class DiagnosticSeverity(StrEnum):
@@ -168,6 +186,7 @@ class Prologue(FrozenModel):
     """One parsed source-code prologue."""
 
     name: str | None = None
+    syntax: PrologueSyntax = PrologueSyntax.STARLSE
     marker: PrologueMarker
     source: SourceSpan
     sections: tuple[Section, ...]
@@ -177,6 +196,7 @@ class CollectionMetadata(FrozenModel):
     """Reader settings recorded with a collection of prologues."""
 
     language: InputLanguage
+    input_format: InputFormat = InputFormat.AUTO
     source_count: int = Field(ge=0)
 
 

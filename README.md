@@ -17,6 +17,12 @@ files into the JSON intermediate representation with:
 starprolog parse source.f source.c -o prologues.json
 ```
 
+Input format detection recognizes both modern STARLSE prologues and the old
+ADAM/SSE Fortran and BDK-style C conventions formerly handled by `procvt`.
+Each prologue records its detected syntax in the intermediate representation.
+Detection can be overridden with `--input-format starlse` or
+`--input-format adamsse`.
+
 Use `--language c` or `--language fortran` to select language-specific lines
 in AST-style public prologues. By default, both variants are retained.
 
@@ -26,6 +32,8 @@ Render a fragment using the traditional Starlink SST LaTeX macros with:
 starprolog latex source.f source.c -o routines.tex
 ```
 
+Legacy prologues are parsed directly into the common document tree and can be
+rendered without first rewriting the source into modern prologue syntax.
 Use `--document` to include portable definitions of the SST macros and emit a
 complete LaTeX document. `--mode auto` distinguishes ADAM A-tasks from library
 routines using each prologue's `Type of Module` section; it can be overridden

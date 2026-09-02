@@ -7,14 +7,13 @@ from collections.abc import Iterable, Sequence
 from enum import StrEnum
 from pathlib import Path
 
-from pydantic import Field
-
 from .models import (
     Block,
     CollectionMetadata,
     Diagnostic,
     DiagnosticSeverity,
     FrozenModel,
+    InputFormat,
     InputLanguage,
     ItemListBlock,
     LineBlock,
@@ -28,6 +27,7 @@ from .models import (
     SectionRole,
     SourceSpan,
 )
+from .raw import LocatedLine, RawPrologue
 
 _MARKER_RE = re.compile(
     r"^(?P<indent>[ \t]*)(?P<comment>[*CcFf#])(?P<tag>[A-Za-z]*)(?P<sign>[+-]{1,2})[ \t]*$"
@@ -94,28 +94,19 @@ class SourceContainer(StrEnum):
     PYTHON_STRING = "python_string"
 
 
-class LocatedLine(FrozenModel):
-    """Normalized source line and its original line number."""
-
-    number: int = Field(ge=1)
-    text: str
-
-
-class RawPrologue(FrozenModel):
-    """Extracted prologue before structural section parsing."""
-
-    marker: PrologueMarker
-    source: SourceSpan
-    lines: tuple[LocatedLine, ...]
-
-
 class ReaderOptions(FrozenModel):
     """Options controlling the Starlink source reader."""
 
     language: InputLanguage = InputLanguage.ALL
+    input_format: InputFormat = InputFormat.AUTO
 
 
-def parse_paths(paths: Iterable[Path], *, language: InputLanguage = InputLanguage.ALL) -> PrologueCollection:
+def parse_paths(
+    paths: Iterable[Path],
+    *,
+    language: InputLanguage = InputLanguage.ALL,
+    input_format: InputFormat = InputFormat.AUTO,
+) -> PrologueCollection:
     """Parse Starlink prologues from source files.
 
     Parameters
@@ -124,6 +115,8 @@ def parse_paths(paths: Iterable[Path], *, language: InputLanguage = InputLanguag
         Paths to source files. Files are processed in the supplied order.
     language
         Language-specific lines to retain in AST-style public prologues.
+    input_format
+        Source-prologue format to detect and parse.
 
     Returns
     -------
@@ -133,7 +126,7 @@ def parse_paths(paths: Iterable[Path], *, language: InputLanguage = InputLanguag
     path_list = tuple(paths)
     prologues: list[Prologue] = []
     diagnostics: list[Diagnostic] = []
-    options = ReaderOptions(language=language)
+    options = ReaderOptions(language=language, input_format=input_format)
 
     for path in path_list:
         data = path.read_bytes()
@@ -154,7 +147,11 @@ def parse_paths(paths: Iterable[Path], *, language: InputLanguage = InputLanguag
         diagnostics.extend(found_diagnostics)
 
     return PrologueCollection(
-        metadata=CollectionMetadata(language=language, source_count=len(path_list)),
+        metadata=CollectionMetadata(
+            language=language,
+            input_format=input_format,
+            source_count=len(path_list),
+        ),
         prologues=tuple(prologues),
         diagnostics=tuple(diagnostics),
     )
@@ -165,6 +162,7 @@ def parse_text(
     *,
     source: str = "<memory>",
     language: InputLanguage = InputLanguage.ALL,
+    input_format: InputFormat = InputFormat.AUTO,
 ) -> PrologueCollection:
     """Parse Starlink prologues from an in-memory source string.
 
@@ -176,24 +174,62 @@ def parse_text(
         Source name recorded in model locations and diagnostics.
     language
         Language-specific lines to retain in AST-style public prologues.
+    input_format
+        Source-prologue format to detect and parse.
 
     Returns
     -------
     collection : `PrologueCollection`
         Parsed prologues and any non-fatal diagnostics.
     """
-    prologues, diagnostics = _parse_source(text, source, ReaderOptions(language=language))
+    prologues, diagnostics = _parse_source(
+        text,
+        source,
+        ReaderOptions(language=language, input_format=input_format),
+    )
     return PrologueCollection(
-        metadata=CollectionMetadata(language=language, source_count=1),
+        metadata=CollectionMetadata(
+            language=language,
+            input_format=input_format,
+            source_count=1,
+        ),
         prologues=tuple(prologues),
         diagnostics=tuple(diagnostics),
     )
 
 
 def _parse_source(text: str, source: str, options: ReaderOptions) -> tuple[list[Prologue], list[Diagnostic]]:
-    raw_prologues, diagnostics = _extract_prologues(text, source, options)
+    raw_prologues: list[RawPrologue] = []
+    diagnostics: list[Diagnostic] = []
+    if options.input_format in {InputFormat.AUTO, InputFormat.STARLSE}:
+        modern, modern_diagnostics = _extract_prologues(text, source, options)
+        raw_prologues.extend(modern)
+        diagnostics.extend(modern_diagnostics)
+    if options.input_format in {InputFormat.AUTO, InputFormat.ADAMSSE}:
+        from .adamsse import extract_adamsse_prologues
+
+        legacy, legacy_diagnostics = extract_adamsse_prologues(text, source)
+        if options.input_format is InputFormat.AUTO:
+            legacy = [
+                candidate
+                for candidate in legacy
+                if not any(_spans_overlap(candidate.source, modern.source) for modern in raw_prologues)
+            ]
+            legacy_diagnostics = [
+                diagnostic
+                for diagnostic in legacy_diagnostics
+                if diagnostic.source is None
+                or any(diagnostic.source == candidate.source for candidate in legacy)
+            ]
+        raw_prologues.extend(legacy)
+        diagnostics.extend(legacy_diagnostics)
+    raw_prologues.sort(key=lambda prologue: prologue.source.start_line)
     prologues = [_parse_prologue(raw, diagnostics) for raw in raw_prologues]
     return prologues, diagnostics
+
+
+def _spans_overlap(first: SourceSpan, second: SourceSpan) -> bool:
+    return first.start_line <= second.end_line and second.start_line <= first.end_line
 
 
 def _extract_prologues(
@@ -363,6 +399,7 @@ def _parse_prologue(raw: RawPrologue, diagnostics: list[Diagnostic]) -> Prologue
     name = _extract_name(sections)
     return Prologue(
         name=name,
+        syntax=raw.syntax,
         marker=raw.marker,
         source=raw.source,
         sections=tuple(sections),
