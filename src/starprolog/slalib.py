@@ -440,6 +440,9 @@ def _arguments(
             output.append(LocatedLine(number=index + 1, text=f"{' ' * (level + 3)}{text}"))
             continue
         name, kind, description = entry
+        # TODO: an entry naming several variables, such as "XI,ETA  dp  ...",
+        # should become one subsection per variable. The description covers
+        # them all and cannot be divided, so it has to be repeated on each.
         output.append(LocatedLine(number=index + 1, text=f"{' ' * (level + 3)}{name} = {kind} ({mode})"))
         if description:
             output.append(LocatedLine(number=index + 1, text=f"{' ' * (level + 6)}{description}"))

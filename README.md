@@ -142,6 +142,15 @@ field with a single space, use a notation of their own such as `(input)`, or
 give no type at all. These are kept verbatim rather than guessed at, and reach
 the output as entries with no description.
 
+**An entry naming several variables stays one row.** `XI,ETA  dp  tangent
+plane rectangular coordinates` describes two arguments, and the intermediate
+representation should hold one subsection for each. It currently holds one,
+titled `XI,ETA = dp (Given)`. Splitting the name on its commas is
+straightforward; the description covers both variables and cannot be divided,
+so it has to be repeated on each. This affects 117 of the 1014 argument
+entries, 113 of them naming two variables and four naming three. It is a
+to-do, not a decision to keep the present shape.
+
 **A qualifier on an argument heading loses its group.** `Given:  (all
 B1950.0,FK4)` qualifies the list that follows it, but once the lists merge
 there is no group left for it to qualify, so it is kept as an entry of its own
