@@ -142,6 +142,24 @@ field with a single space, use a notation of their own such as `(input)`, or
 give no type at all. These are kept verbatim rather than guessed at, and reach
 the output as entries with no description.
 
+**Argument types keep their SLALIB shorthand.** The type is written `d` or
+`dp` for double precision, `i` or `int` for integer, `r` or `real`, `c` or
+`char`, and `l`, in either case, rather than in the spelling the rest of
+Starlink uses. Across the 1014 typed entries that is 579 double precision, 178
+integer, 111 real, 89 logical and 55 character. These should be normalized,
+Fortran to `DOUBLE PRECISION`, `INTEGER`, `REAL`, `LOGICAL` and `CHARACTER`,
+and C to `double`, `int`, `float`, `int` and `char *`.
+
+Two details are unsettled. Argument sections elsewhere in Starlink use the
+bare Fortran type, `DOUBLE PRECISION` in 1376 entries against 29 for
+`_DOUBLE`; the underscore spelling belongs to `ADAM Parameters` sections,
+where it leads 326 to 11. The normalization should therefore produce
+`DOUBLE PRECISION`. And a dimension is written on the type here, `d(3,3)`,
+where Starlink writes it on the name, `RMATN( 3, 3 ) = DOUBLE PRECISION`, so
+normalizing means moving it across. Choosing the C spellings also needs a
+language to select on, which this reader does not yet have; the convention is
+Fortran-only in practice.
+
 **An entry naming several variables stays one row.** `XI,ETA  dp  tangent
 plane rectangular coordinates` describes two arguments, and the intermediate
 representation should hold one subsection for each. It currently holds one,

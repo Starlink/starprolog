@@ -443,6 +443,10 @@ def _arguments(
         # TODO: an entry naming several variables, such as "XI,ETA  dp  ...",
         # should become one subsection per variable. The description covers
         # them all and cannot be divided, so it has to be repeated on each.
+        # TODO: the type keeps its SLALIB shorthand, "d" or "dp" for double
+        # precision and so on, and should be normalized to the spelling the
+        # rest of Starlink uses. A dimension is written on the type here,
+        # "d(3,3)", where Starlink writes it on the name.
         output.append(LocatedLine(number=index + 1, text=f"{' ' * (level + 3)}{name} = {kind} ({mode})"))
         if description:
             output.append(LocatedLine(number=index + 1, text=f"{' ' * (level + 6)}{description}"))
