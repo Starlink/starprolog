@@ -65,6 +65,8 @@ class SectionRole(StrEnum):
     ARGUMENTS = "arguments"
     AUTHORS = "authors"
     BUGS = "bugs"
+    CLASS_MEMBERSHIP = "class_membership"
+    CONSTRUCTOR_FUNCTION = "constructor_function"
     COPYRIGHT = "copyright"
     DESCRIPTION = "description"
     EXAMPLES = "examples"
@@ -80,6 +82,7 @@ class SectionRole(StrEnum):
     PURPOSE = "purpose"
     RETURNED_VALUE = "returned_value"
     SYNOPSIS = "synopsis"
+    TYPE = "type"
     TYPE_OF_MODULE = "type_of_module"
     USAGE = "usage"
 

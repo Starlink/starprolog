@@ -175,3 +175,18 @@ def test_decorative_plus_ruler_is_not_a_prologue() -> None:
     collection = parse_text("*++++++++++++++++++++\n* text\n*--------------------\n")
 
     assert not collection.prologues
+
+
+def test_tab_indented_body_does_not_hide_section_headings() -> None:
+    """A tab in section content is interpreted as expanded indentation."""
+    collection = parse_text(
+        "*+\n*  Name:\n*     TABBED\n*  Purpose:\n*     Test tabs.\n"
+        "*  History:\n*     1-SEP-2026:\n*\tChanged something.\n*-\n"
+    )
+
+    assert collection.prologues[0].name == "TABBED"
+    assert [section.role for section in collection.prologues[0].sections] == [
+        SectionRole.NAME,
+        SectionRole.PURPOSE,
+        SectionRole.HISTORY,
+    ]

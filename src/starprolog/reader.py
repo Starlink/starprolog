@@ -48,6 +48,8 @@ _SECTION_ROLES = {
     "arguments": SectionRole.ARGUMENTS,
     "authors": SectionRole.AUTHORS,
     "bugs": SectionRole.BUGS,
+    "class membership": SectionRole.CLASS_MEMBERSHIP,
+    "constructor function": SectionRole.CONSTRUCTOR_FUNCTION,
     "copyright": SectionRole.COPYRIGHT,
     "description": SectionRole.DESCRIPTION,
     "examples": SectionRole.EXAMPLES,
@@ -65,6 +67,7 @@ _SECTION_ROLES = {
     "return value": SectionRole.RETURNED_VALUE,
     "returned value": SectionRole.RETURNED_VALUE,
     "synopsis": SectionRole.SYNOPSIS,
+    "type": SectionRole.TYPE,
     "type of module": SectionRole.TYPE_OF_MODULE,
     "usage": SectionRole.USAGE,
 }
@@ -587,7 +590,7 @@ def _dedent_lines(lines: Sequence[LocatedLine]) -> list[LocatedLine]:
     return [
         LocatedLine(
             number=line.number,
-            text=line.text[base_indent:] if line.text.strip() else "",
+            text=line.text.expandtabs(8)[base_indent:] if line.text.strip() else "",
         )
         for line in lines
     ]
@@ -621,4 +624,5 @@ def _extract_name(sections: Sequence[Section]) -> str | None:
 
 
 def _indent(value: str) -> int:
-    return len(value) - len(value.lstrip())
+    leading = value[: len(value) - len(value.lstrip())]
+    return len(leading.expandtabs(8))

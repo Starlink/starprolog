@@ -31,6 +31,20 @@ complete LaTeX document. `--mode auto` distinguishes ADAM A-tasks from library
 routines using each prologue's `Type of Module` section; it can be overridden
 with `--mode atask` or `--mode library`.
 
+The explicitly AST-specific `astprep` command replaces the documentation
+preprocessing performed by AST's historical `getatt` Perl script. For example:
+
+```sh
+starprolog astprep --kind class --language fortran \
+    --labels getatt.labels ast/src/*.c -o f_classes.tex
+```
+
+It sorts and selects AST tagged prologues, applies the language-specific
+section transformations, and can emit either drop-in LaTeX or its Pydantic
+model with `--format json`. `--unix-script` selects the hash-comment command
+prologues formerly requested with `getatt -u`. This is an AST extension, not a
+general Starlink prologue convention. POD is not supported.
+
 ## Development
 
 Create the uv environment with the development dependencies and run the

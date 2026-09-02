@@ -30,6 +30,7 @@ def test_main_help_lists_parse_command() -> None:
     result = CliRunner().invoke(main, ["--help"])
 
     assert result.exit_code == 0
+    assert "astprep" in result.output
     assert "parse" in result.output
     assert "latex" in result.output
 
@@ -49,3 +50,26 @@ def test_latex_command_writes_fragment(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     assert result.output.startswith("\\sstroutine{")
     assert "\\sstinvocation{" in result.output
+
+
+def test_astprep_command_writes_latex_and_labels(tmp_path: Path) -> None:
+    """The AST extension writes transformed LaTeX and escaped labels."""
+    runner = CliRunner()
+    source = tmp_path / "source.c"
+    labels = tmp_path / "labels.txt"
+    source.write_text(
+        "/*\n*++\n*  Name:\nc     ast_Test\nf     AST_TEST\n"
+        "*  Purpose:\n*     Test AST prep.\n*  Synopsis:\n"
+        "c     void ast_Test( void )\nf     CALL AST_TEST( STATUS )\n"
+        "*  Description:\n*     Exercise CLI.\n*--\n*/\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        main,
+        ["astprep", "--labels", str(labels), str(source)],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "\\sstsynopsis{" in result.output
+    assert labels.read_text(encoding="utf-8") == "ast\\_Test\n"

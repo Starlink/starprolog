@@ -60,6 +60,7 @@ _DOCUMENT_PREAMBLE = r"""\documentclass[11pt]{article}
 \newcommand{\sstusage}[1]{\item[Usage:] \texttt{#1}}
 \newcommand{\sstinvocation}[1]{\item[Invocation:] \texttt{#1}}
 \newcommand{\sstarguments}[1]{\item[Arguments:]\begin{description}#1\end{description}}
+\newcommand{\sstapplicability}[1]{\item[Applicability:]\begin{description}#1\end{description}}
 \newcommand{\sstreturnedvalue}[1]{\item[Returned Value:]\begin{description}#1\end{description}}
 \newcommand{\sstparameters}[1]{\item[Parameters:]\begin{description}#1\end{description}}
 \newcommand{\sstexamples}[1]{\item[Examples:]\begin{description}#1\end{description}}
@@ -83,8 +84,10 @@ _EXCLUDED_ROLES = {
     SectionRole.NAME,
     SectionRole.PURPOSE,
     SectionRole.LANGUAGE,
+    SectionRole.CLASS_MEMBERSHIP,
     SectionRole.TYPE_OF_MODULE,
     SectionRole.SYNOPSIS,
+    SectionRole.TYPE,
     SectionRole.AUTHORS,
     SectionRole.HISTORY,
     SectionRole.IMPLEMENTATION_DEFICIENCIES,
@@ -228,11 +231,11 @@ def render_prologue_latex(
     if parameters is not None:
         body.extend(_render_wrapped_section(parameter_macro, parameters, subsections=True))
 
-    if atask:
-        applicability = _find_section(prologue, SectionRole.APPLICABILITY, nonempty=True)
-        if applicability is not None:
-            body.extend(_render_diy_section(applicability, subsections=True))
-    else:
+    applicability = _find_section(prologue, SectionRole.APPLICABILITY, nonempty=True)
+    if applicability is not None:
+        body.extend(_render_wrapped_section("sstapplicability", applicability, subsections=True))
+
+    if not atask:
         returned = _find_section(prologue, SectionRole.RETURNED_VALUE, nonempty=True)
         if returned is not None:
             body.extend(_render_wrapped_section("sstreturnedvalue", returned, subsections=True))
