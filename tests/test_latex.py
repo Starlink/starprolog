@@ -199,3 +199,176 @@ def test_preserved_block_closing_marker_emits_a_newline() -> None:
     result = render_latex(collection)
 
     assert result.count("\\newline") == 5
+
+
+_MIXED = """\
+*+
+*  Name:
+*     MIX
+*  Purpose:
+*     Exercise paragraphs, items and blocks.
+*  Description:
+*     First paragraph at base.
+*
+*        Second paragraph indented three.
+*
+*     - First item
+*       continued here
+*         and deeper here.
+*     - Second item.
+*
+*     Text after the list.
+*     ---
+*        Inside the block.
+*     ---
+*     Text after the block.
+*-
+"""
+
+
+def test_paragraph_mode_matches_sst_latp() -> None:
+    """Mixed body content renders exactly as SST_LATP writes it."""
+    result = render_latex(parse_text(_MIXED))
+
+    assert (
+        "\n".join(
+            (
+                "   \\sstdescription{",
+                "      First paragraph at base.",
+                "",
+                "         Second paragraph indented three.",
+                "",
+                "      \\sstitemlist{",
+                "",
+                "         \\sstitem",
+                "          First item",
+                "           continued here",
+                "             and deeper here.",
+                "",
+                "         \\sstitem",
+                "          Second item.",
+                "",
+                "      }",
+                "      Text after the list.",
+                "      \\newline",
+                "      \\newline",
+                "      \\hspace*{1.5 em}",
+                "         Inside the block.",
+                "      \\newline",
+                "      \\newline",
+                "      Text after the block.",
+                "   }",
+            )
+        )
+        in result
+    )
+
+
+def test_item_list_without_a_preceding_blank_line() -> None:
+    """SST_LATP opens an item list without inserting a blank line first."""
+    result = render_latex(
+        parse_text(
+            "*+\n*  Name:\n*     MIX2\n*  Purpose:\n*     Exercise adjacency.\n"
+            "*  Description:\n"
+            "*     Lead-in with no blank before the list.\n"
+            "*     - Item one\n"
+            "*     - Item two\n"
+            "*     Trailing text with no blank line.\n*-\n"
+        )
+    )
+
+    assert (
+        "\n".join(
+            (
+                "      Lead-in with no blank before the list.",
+                "      \\sstitemlist{",
+                "",
+                "         \\sstitem",
+                "          Item one",
+                "",
+                "         \\sstitem",
+                "          Item two",
+                "         Trailing text with no blank line.",
+                "      }",
+            )
+        )
+        in result
+    )
+
+
+_PARAMETER_SECTIONS = """\
+*+
+*  Name:
+*     CASE
+*  Purpose:
+*     Check the parameter-section heuristic.
+*  Invocation:
+*     CALL CASE( STATUS )
+*  Formal parameters:
+*     VALUE = INTEGER (Given)
+*        A value.
+*  Environment Parameters:
+*     OTHER = INTEGER (Given)
+*        Another value.
+*-
+"""
+
+
+def test_parameter_subsections_are_case_sensitive() -> None:
+    """SST_TRLAT tests for a capitalized "Parameters" in the section title."""
+    result = render_latex(parse_text(_PARAMETER_SECTIONS))
+
+    assert (
+        "\n".join(
+            (
+                "   \\sstdiytopic{",
+                "      Formal parameters",
+                "   }{",
+                "      VALUE = INTEGER (Given)",
+                "         A value.",
+                "   }",
+                "   \\sstdiylist{",
+                "      Environment Parameters",
+                "   }{",
+                "      \\sstsubsection{",
+                "         OTHER = INTEGER (Given)",
+                "      }{",
+                "         Another value.",
+                "      }",
+                "   }",
+            )
+        )
+        in result
+    )
+
+
+def test_purpose_is_written_in_paragraph_mode() -> None:
+    """SST_TRLAT sends the purpose through SST_LATP, so lists are honored."""
+    result = render_latex(
+        parse_text(
+            "*+\n"
+            "* Name:\n"
+            "*    ANYTRUE\n"
+            "* Purpose:\n"
+            "*   Checks if any element of the logical array reject is .true.\n"
+            "*       - returns as .true. if any is.\n"
+            "*-\n"
+        )
+    )
+
+    assert result.startswith(
+        "\n".join(
+            (
+                "\\sstroutine{",
+                "   ANYTRUE",
+                "}{",
+                "   Checks if any element of the logical array reject is .true.",
+                "   \\sstitemlist{",
+                "",
+                "      \\sstitem",
+                "           returns as .true. if any is",
+                "   }",
+                "}{",
+            )
+        )
+    )

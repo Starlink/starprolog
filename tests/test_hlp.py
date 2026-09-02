@@ -127,3 +127,169 @@ def test_render_rejects_missing_required_sections() -> None:
         match=r"empty\.f:1: missing required section\(s\): Description, Invocation",
     ):
         render_hlp(collection)
+
+
+def test_paragraph_mode_matches_sst_putp() -> None:
+    """Mixed body content renders exactly as SST_PUTP writes it."""
+    result = render_hlp(
+        parse_text(
+            """\
+*+
+*  Name:
+*     MIX
+*  Purpose:
+*     Exercise paragraphs, items and blocks.
+*  Invocation:
+*     CALL MIX( STATUS )
+*  Description:
+*     First paragraph at base.
+*
+*        Second paragraph indented three.
+*
+*     - First item
+*       continued here
+*         and deeper here.
+*     - Second item.
+*
+*     Text after the list.
+*     ---
+*        Inside the block.
+*     ---
+*     Text after the block.
+*-
+"""
+        )
+    )
+
+    assert (
+        "\n".join(
+            (
+                "   First paragraph at base.",
+                "",
+                "      Second paragraph indented three.",
+                "",
+                "   - First item",
+                "     continued here",
+                "       and deeper here.",
+                "",
+                "   - Second item.",
+                "",
+                "   Text after the list.",
+                "",
+                "   ---",
+                "      Inside the block.",
+                "",
+                "   ---",
+                "   Text after the block.",
+            )
+        )
+        in result
+    )
+
+
+def test_diy_sections_always_use_paragraph_mode() -> None:
+    """SST_TRHLP writes every remaining section with SST_PUTP, not a list."""
+    result = render_hlp(
+        parse_text(
+            """\
+*+
+*  Name:
+*     CASE
+*  Purpose:
+*     Check the parameter-section heuristic.
+*  Invocation:
+*     CALL CASE( STATUS )
+*  Description:
+*     Body text.
+*  Environment Parameters:
+*     OTHER = INTEGER (Given)
+*        Another value.
+*-
+"""
+        )
+    )
+
+    assert (
+        "\n".join(
+            (
+                "2 Environment_Parameters",
+                "   OTHER = INTEGER (Given)",
+                "      Another value.",
+            )
+        )
+        in result
+    )
+
+
+def test_flattened_subsection_bodies_keep_their_source_offset() -> None:
+    """SST_PUTP writes raw lines, so a body keeps its own indent."""
+    result = render_hlp(
+        parse_text(
+            """\
+*+
+*  Name:
+*     ARC2D
+*  Purpose:
+*     Check subsection offsets.
+*  Invocation:
+*     CALL ARC2D( STATUS )
+*  Description:
+*     Body text.
+*  Parameters:
+*    IMAGE = FILE (Read)
+*        Name of image for input
+*          This should be a file containing an arc spectrum.
+*-
+"""
+        )
+    )
+
+    assert (
+        "\n".join(
+            (
+                "2 Parameters",
+                "   IMAGE = FILE (Read)",
+                "       Name of image for input",
+                "         This should be a file containing an arc spectrum.",
+            )
+        )
+        in result
+    )
+
+
+def test_flattened_subsection_titles_keep_their_own_column() -> None:
+    """A subsection deeper than its body keeps that extra indentation."""
+    result = render_hlp(
+        parse_text(
+            """\
+*+
+* Name:
+*    CHANGED
+* Purpose:
+*    Check subsection columns.
+* Invocation:
+*    CALL CHANGED( STATUS )
+* Description:
+*    Body text.
+* Parameters:
+*    IMAGE = FILE (Read)
+*        Name of image for input
+*
+*   T.N.Wilkins, Cambridge, 18-MAY-1990
+*-
+"""
+        )
+    )
+
+    assert (
+        "\n".join(
+            (
+                "2 Parameters",
+                "    IMAGE = FILE (Read)",
+                "        Name of image for input",
+                "",
+                "   T.N.Wilkins, Cambridge, 18-MAY-1990",
+            )
+        )
+        in result
+    )

@@ -7,12 +7,11 @@ __all__ = (
     "render_prologue_latex",
 )
 
+from collections.abc import Sequence
+
 from .models import (
     DocumentationMode,
     FrozenModel,
-    ItemListBlock,
-    LineBlock,
-    ParagraphBlock,
     Prologue,
     PrologueCollection,
     Section,
@@ -254,15 +253,34 @@ def render_prologue_latex(
     if bugs is not None:
         body.extend(_render_wrapped_section("sstbugs", bugs))
 
-    purpose_text = purpose.plain_text().rstrip()
-    if purpose_text.endswith("."):
-        purpose_text = purpose_text[:-1]
     lines = [r"\sstroutine{", f"   {escape_latex(name)}", "}{"]
-    lines.extend(f"   {escape_latex(line)}" if line else "" for line in purpose_text.splitlines())
+    lines.extend(_render_paragraph_mode(_purpose_lines(purpose), indent=3))
     lines.append("}{")
     lines.extend(body)
     lines.append("}")
     return "\n".join(lines) + "\n"
+
+
+def _purpose_lines(purpose: Section) -> list[str]:
+    """Return the purpose body with the trailing full stop removed.
+
+    Parameters
+    ----------
+    purpose
+        The prologue's purpose section.
+
+    Returns
+    -------
+    lines : `list` [`str`]
+        Body lines with any full stop dropped from the last of them, the way
+        ``SST_TRLAT`` shortens the section before writing it.
+    """
+    lines = purpose.body_lines()
+    for index in reversed(range(len(lines))):
+        if lines[index].strip():
+            lines[index] = lines[index].rstrip().removesuffix(".")
+            break
+    return lines
 
 
 def _render_wrapped_section(
@@ -310,36 +328,76 @@ def _render_subsections(section: Section, *, indent: int, examples: bool = False
 
 
 def _render_blocks(section: Section, *, indent: int) -> list[str]:
+    return _render_paragraph_mode(section.body_lines(), indent=indent)
+
+
+def _render_paragraph_mode(body: Sequence[str], *, indent: int) -> list[str]:
+    """Write body lines in paragraph mode, as ``SST_LATP`` does.
+
+    Parameters
+    ----------
+    body
+        Section body lines, indented relative to the body.
+    indent
+        Base level of indentation for the output.
+
+    Returns
+    -------
+    lines : `list` [`str`]
+        LaTeX source lines for the section body.
+    """
     output: list[str] = []
-    prefix = " " * indent
-    for index, block in enumerate(section.blocks):
-        if index:
-            output.append("")
-        if isinstance(block, ParagraphBlock):
-            output.extend(f"{prefix}{escape_latex(line)}" for line in block.lines)
-        elif isinstance(block, ItemListBlock):
-            output.append(f"{prefix}\\sstitemlist{{")
-            for item in block.items:
-                output.append(f"{prefix}   \\sstitem")
-                output.extend(f"{prefix}      {escape_latex(line)}" for line in item.lines)
-            output.append(f"{prefix}}}")
-        elif isinstance(block, LineBlock):
-            output.extend(_render_line_block(block, indent=indent))
-    return output
+    current = indent
+    items = False
+    previous_blank = True
+    preserve = False
+    marker_indent = 0
 
-
-def _render_line_block(block: LineBlock, *, indent: int) -> list[str]:
-    prefix = " " * indent
-    output = [f"{prefix}\\newline", f"{prefix}\\newline"]
-    for line in block.lines:
+    for line in body:
         if not line.strip():
-            output.append(f"{prefix}\\newline")
+            if preserve:
+                output.append(f"{' ' * current}\\newline")
+            elif not previous_blank:
+                output.append("")
+                previous_blank = True
             continue
-        leading = len(line) - len(line.lstrip(" "))
-        spaces = leading - block.marker_indent
-        if spaces > 0:
-            output.append(f"{prefix}\\hspace*{{{spaces / 2:g} em}}")
-        output.append(f"{prefix}{' ' * leading}{escape_latex(line[leading:])}")
-        output.append(f"{prefix}\\newline")
-    output.append(f"{prefix}\\newline")
+
+        column = len(line) - len(line.lstrip(" "))
+        text = line.strip()
+        use = True
+
+        if text == "---":
+            preserve = not preserve
+            marker_indent = column
+            output.append(f"{' ' * current}\\newline")
+            if preserve:
+                output.append(f"{' ' * current}\\newline")
+            use = False
+        elif text.startswith("-"):
+            if not items:
+                items = True
+                output.append(f"{' ' * current}\\sstitemlist{{")
+                previous_blank = False
+                current += 3
+            if not previous_blank:
+                output.append("")
+            output.append(f"{' ' * current}\\sstitem")
+            column += 1
+            text = line[column:].strip()
+        elif previous_blank and items:
+            items = False
+            current -= 3
+            output.append(f"{' ' * current}}}")
+
+        if use and text:
+            spaces = column - marker_indent
+            if preserve and spaces > 0:
+                output.append(f"{' ' * current}\\hspace*{{{spaces / 2:g} em}}")
+            output.append(f"{' ' * (current + column)}{escape_latex(text)}")
+            if preserve:
+                output.append(f"{' ' * current}\\newline")
+        previous_blank = False
+
+    if items:
+        output.append(f"{' ' * (current - 3)}}}")
     return output

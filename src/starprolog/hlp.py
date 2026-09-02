@@ -11,9 +11,6 @@ import re
 from .models import (
     DocumentationMode,
     FrozenModel,
-    ItemListBlock,
-    LineBlock,
-    ParagraphBlock,
     Prologue,
     PrologueCollection,
     Section,
@@ -182,7 +179,7 @@ def render_prologue_hlp(
         if section.role in _EXCLUDED_ROLES or not section.has_content:
             continue
         output.append(f"2 {_help_key(section.title)}")
-        output.extend(_render_section_content(section, indent=3))
+        output.extend(_render_blocks(section, indent=3))
 
     authors = prologue.find_section(SectionRole.AUTHORS, nonempty=True)
     if authors is not None:
@@ -210,16 +207,6 @@ def render_prologue_hlp(
     return "\n".join(output).rstrip() + "\n"
 
 
-def _render_section_content(section: Section, *, indent: int) -> list[str]:
-    if section.subsections:
-        return _render_subsections(
-            section,
-            header_indent=indent,
-            body_indent=indent + 3,
-        )
-    return _render_blocks(section, indent=indent)
-
-
 def _render_subsections(
     section: Section,
     *,
@@ -236,27 +223,36 @@ def _render_subsections(
 
 
 def _render_blocks(section: Section, *, indent: int) -> list[str]:
+    """Write a section body in paragraph mode, as ``SST_PUTP`` does.
+
+    Parameters
+    ----------
+    section
+        Section whose body is to be rendered.
+    indent
+        Base level of indentation for the output.
+
+    Returns
+    -------
+    lines : `list` [`str`]
+        Help-library lines for the section body.
+    """
     output: list[str] = []
-    prefix = " " * indent
-    for index, block in enumerate(section.blocks):
-        if index and output and output[-1] != "":
+    previous_blank = True
+    for line in section.body_lines():
+        if not line.strip():
+            if not previous_blank:
+                output.append("")
+                previous_blank = True
+            continue
+        text = line.strip()
+        # A hyphen starts an item, which is separated from whatever precedes
+        # it. The preserved-block "---" markers count as items here too.
+        if text.startswith("-") and not previous_blank:
             output.append("")
-        if isinstance(block, ParagraphBlock):
-            for line in block.lines:
-                if line.lstrip().startswith("-") and output and output[-1]:
-                    output.append("")
-                output.append(f"{prefix}{line}" if line else "")
-        elif isinstance(block, LineBlock):
-            output.extend(f"{prefix}{line}" if line else "" for line in block.lines)
-        elif isinstance(block, ItemListBlock):
-            for item_index, item in enumerate(block.items):
-                if item_index:
-                    output.append("")
-                if not item.lines:
-                    output.append(f"{prefix}-")
-                    continue
-                output.append(f"{prefix}- {item.lines[0]}")
-                output.extend(f"{prefix}{line}" for line in item.lines[1:])
+        column = len(line) - len(line.lstrip(" "))
+        output.append(f"{' ' * (indent + column)}{text}")
+        previous_blank = False
     return _trim_blank_lines(output)
 
 

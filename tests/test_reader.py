@@ -8,6 +8,7 @@ from starprolog import (
     PrologueKind,
     SectionRole,
     parse_text,
+    render_latex,
 )
 
 
@@ -55,7 +56,10 @@ def test_fortran_prologue_sections_and_subsections() -> None:
     assert isinstance(arguments.subsections[0].blocks[0], ParagraphBlock)
     notes = prologue.sections[3]
     assert isinstance(notes.blocks[0], ItemListBlock)
-    assert notes.blocks[0].items[1].lines == ("Second item continuing", "on another line.")
+    assert notes.blocks[0].items[1].lines == (
+        "- Second item continuing",
+        "  on another line.",
+    )
     authors = prologue.sections[4]
     assert len(authors.subsections) == 1
 
@@ -202,7 +206,8 @@ def test_double_hyphen_starts_an_item_consuming_one_hyphen() -> None:
 
     description = collection.prologues[0].sections[2]
     assert isinstance(description.blocks[0], ItemListBlock)
-    assert description.blocks[0].items[0].lines == ("- VALUE=0 retains its meaning.",)
+    assert description.blocks[0].items[0].lines == ("-- VALUE=0 retains its meaning.",)
+    assert "          - VALUE=0 retains its meaning." in render_latex(collection)
 
 
 def test_indented_python_docstring_prologue_is_terminated() -> None:

@@ -504,7 +504,9 @@ def _parse_sections(
         role = _role_for_title(title)
         end_line = lines[stop_index - 1].number if stop_index > header_index + 1 else header.number
         span = SourceSpan(path=source, start_line=header.number, end_line=end_line)
-        parse_as_subsections = role in _SUBSECTION_ROLES or "parameters" in title.casefold()
+        # SST_TRLAT lists any remaining section whose heading contains a
+        # capitalized "Parameters" as subsections rather than paragraphs.
+        parse_as_subsections = role in _SUBSECTION_ROLES or "Parameters" in title
         if body and parse_as_subsections:
             subsections = tuple(_parse_subsections(body, source, diagnostics))
             blocks: tuple[Block, ...] = ()
@@ -527,16 +529,21 @@ def _parse_sections(
 def _parse_subsections(
     lines: Sequence[LocatedLine], source: str, diagnostics: list[Diagnostic]
 ) -> list[Section]:
+    base_indent = _base_indent(lines)
     subsections: list[Section] = []
     for header_index, stop_index in _find_sections(lines):
         header = lines[header_index]
+        header_indent = _indent(header.text)
         body = _trim_blank_lines(lines[header_index + 1 : stop_index])
         end_line = lines[stop_index - 1].number if stop_index > header_index + 1 else header.number
+        offset = max(_base_indent(body) - header_indent, 0) if body else 0
         subsections.append(
             Section(
                 title=header.text.strip(),
                 source=SourceSpan(path=source, start_line=header.number, end_line=end_line),
                 blocks=tuple(_parse_blocks(body, source, diagnostics)),
+                title_indent=max(header_indent - base_indent, 0),
+                body_indent=offset,
             )
         )
     return subsections
@@ -562,7 +569,7 @@ def _parse_blocks(lines: Sequence[LocatedLine], source: str, diagnostics: list[D
     for line in lines:
         if line.text.strip() == "---":
             if preserved is None:
-                blocks.extend(_parse_ordinary_blocks(ordinary, source))
+                blocks.extend(_parse_ordinary_blocks(ordinary, source, base_indent))
                 ordinary = []
                 preserved = []
                 marker_line = line
@@ -590,12 +597,12 @@ def _parse_blocks(lines: Sequence[LocatedLine], source: str, diagnostics: list[D
             )
         )
     else:
-        blocks.extend(_parse_ordinary_blocks(ordinary, source))
+        blocks.extend(_parse_ordinary_blocks(ordinary, source, base_indent))
 
     return blocks
 
 
-def _parse_ordinary_blocks(lines: Sequence[LocatedLine], source: str) -> list[Block]:
+def _parse_ordinary_blocks(lines: Sequence[LocatedLine], source: str, base_indent: int) -> list[Block]:
     chunks: list[list[LocatedLine]] = []
     current: list[LocatedLine] = []
     for line in lines:
@@ -609,7 +616,7 @@ def _parse_ordinary_blocks(lines: Sequence[LocatedLine], source: str) -> list[Bl
 
     blocks: list[Block] = []
     for chunk in chunks:
-        dedented = _dedent_lines(chunk)
+        dedented = _shift_lines(chunk, base_indent)
         paragraph: list[LocatedLine] = []
         items: list[ListItem] = []
         active_item: list[LocatedLine] | None = None
@@ -646,16 +653,12 @@ def _parse_ordinary_blocks(lines: Sequence[LocatedLine], source: str) -> list[Bl
             active_item = None
 
         for line in dedented:
-            stripped = line.text.lstrip()
-            if stripped.startswith("-"):
+            if line.text.lstrip().startswith("-"):
                 flush_paragraph()
                 flush_item()
-                item_text = stripped[1:]
-                if item_text.startswith(" "):
-                    item_text = item_text[1:]
-                active_item = [LocatedLine(number=line.number, text=item_text)]
+                active_item = [line]
             elif active_item is not None:
-                active_item.append(LocatedLine(number=line.number, text=line.text.strip()))
+                active_item.append(line)
             else:
                 paragraph.append(line)
         flush_paragraph()

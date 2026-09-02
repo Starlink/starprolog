@@ -233,3 +233,22 @@ def test_shallow_legacy_body_indentation_is_not_clamped() -> None:
     body = arguments.subsections[0].blocks[0]
     assert isinstance(body, ParagraphBlock)
     assert body.lines == ("The value.",)
+
+
+def test_legacy_invocation_semicolons_become_commas() -> None:
+    """SST_TRCVT translates ';' to ',' in old-style invocation lines."""
+    collection = parse_text(
+        """\
+*+ REF_SPLIT - split an object path name into components
+*    Invocation :
+*     CALL REF_SPLIT(PATH, MAXLEVS; NLEV, COMPONENT, STATUS)
+*-
+""",
+        source="ref_split.f",
+    )
+
+    invocation = collection.prologues[0].sections[-1]
+    assert invocation.role is SectionRole.INVOCATION
+    body = invocation.blocks[0]
+    assert isinstance(body, ParagraphBlock)
+    assert body.lines == ("CALL REF_SPLIT(PATH, MAXLEVS, NLEV, COMPONENT, STATUS)",)

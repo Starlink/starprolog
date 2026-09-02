@@ -147,6 +147,7 @@ def _extract_fortran(
         )
         end = start
         terminated = False
+        invocation = False
         index += 1
 
         while index < len(lines):
@@ -173,7 +174,9 @@ def _extract_fortran(
                     end = max(start, number - 1)
                     terminated = True
                     break
-                normalized.append(LocatedLine(number=number, text=f"  {_normalize_title(title)}:"))
+                heading_title = _normalize_title(title)
+                invocation = heading_title == "Invocation"
+                normalized.append(LocatedLine(number=number, text=f"  {heading_title}:"))
             else:
                 module = _FORTRAN_MODULE_RE.match(line)
                 if module is not None:
@@ -186,7 +189,7 @@ def _extract_fortran(
                 elif line[:1] in _COMMENT_CHARACTERS:
                     # SST_RDAD1 blanks the comment character rather than
                     # removing it, so the rest of the line keeps its column.
-                    normalized.append(_content_line(number, f" {line[1:]}"))
+                    normalized.append(_content_line(number, f" {line[1:]}", invocation=invocation))
             end = number
             index += 1
 
@@ -248,12 +251,9 @@ def _extract_c(
             search += 1
 
         if body_start is not None and first_heading is not None:
-            normalized.append(
-                LocatedLine(
-                    number=body_start + 1,
-                    text=f"  {_normalize_title(first_heading.group('title'))}:",
-                )
-            )
+            heading_title = _normalize_title(first_heading.group("title"))
+            invocation = heading_title == "Invocation"
+            normalized.append(LocatedLine(number=body_start + 1, text=f"  {heading_title}:"))
             search = body_start + 1
             terminated = False
             while search < len(lines):
@@ -266,14 +266,11 @@ def _extract_c(
                     break
                 heading = _C_HEADING_RE.fullmatch(line)
                 if heading is not None:
-                    normalized.append(
-                        LocatedLine(
-                            number=number,
-                            text=f"  {_normalize_title(heading.group('title'))}:",
-                        )
-                    )
+                    heading_title = _normalize_title(heading.group("title"))
+                    invocation = heading_title == "Invocation"
+                    normalized.append(LocatedLine(number=number, text=f"  {heading_title}:"))
                 else:
-                    normalized.append(_content_line(number, _strip_c_content(line)))
+                    normalized.append(_content_line(number, _strip_c_content(line), invocation=invocation))
                 end = number
                 search += 1
             if not terminated:
@@ -352,10 +349,13 @@ def _zap_placeholders(line: str) -> str:
     return line
 
 
-def _content_line(number: int, content: str) -> LocatedLine:
+def _content_line(number: int, content: str, *, invocation: bool = False) -> LocatedLine:
     text = _zap_placeholders(content).rstrip()
     if not text.strip():
         return LocatedLine(number=number, text="")
+    if invocation:
+        # SST_TRCVT translates ';' to ',' in the invocation lines it copies.
+        text = text.replace(";", ",")
     return LocatedLine(number=number, text=text)
 
 

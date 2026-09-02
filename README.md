@@ -76,6 +76,69 @@ model with `--format json`. `--unix-script` selects the hash-comment command
 prologues formerly requested with `getatt -u`. This is an AST extension, not a
 general Starlink prologue convention. POD is not supported.
 
+## Compatibility with prolat and prohlp
+
+The renderers reproduce `prolat` and `prohlp` output for the great majority of
+the Starlink source tree.
+Comparing every prologue in `applications`, `libraries` and `libext` that the
+original tools accept, 98.5% of 13381 LaTeX renderings and 97.7% of 13376 help
+topics are byte-identical.
+
+Every remaining difference comes from one of the deliberate divergences below.
+Each is a case where the original loses or mangles content, so `starprolog`
+does not reproduce it.
+
+### Quoted text does not gain a space
+
+`SST_LAT` writes `\texttt{'}` and `\texttt{"}` into an eleven-character field
+even though the replacement is ten characters long, so Fortran pads it with a
+trailing blank.
+The typeset result is `FrameSet' s` where the source reads `FrameSet's`.
+Every neighbouring escape in the same routine uses its exact length, so this is
+an off-by-one rather than a typographic choice, and `starprolog` emits
+`\texttt{'}` with no trailing space.
+
+### Sections after an empty one are not dropped
+
+The loop in `SST_TRLAT` and `SST_TRHLP` that emits the remaining sections stops
+at the first unrecognized section with no body, so every later section is
+silently discarded.
+A stray prologue line at the indentation of the section headings is enough to
+trigger it, and real prologues lose their parameter and reference sections this
+way.
+`starprolog` emits all the sections it finds.
+
+### Tabs count as the width they display
+
+`SST_FSECT` compares raw character positions, so a tab counts as one column.
+A tab-indented continuation line therefore looks shallower than its section
+heading and is promoted to a heading of its own, which ends the section and
+hides everything that follows.
+`starprolog` expands tabs to the next multiple of eight before comparing
+indentation.
+
+### Comment characters need not be in column one
+
+`SST_RDPRO` only accepts a comment character in the first column, so a prologue
+line indented inside a C block comment is discarded.
+`starprolog` accepts the indented form, which is also what makes prologues
+inside indented C comments and Python docstrings readable.
+
+### Additional section headings are recognized
+
+`Return Value` and `License` are treated as `Returned Value` and `Licence`.
+The original tools match those headings exactly, so they render `Return Value`
+as an ordinary topic and repeat the licence text in the output.
+
+### A prologue is never emitted twice
+
+`getatt` accumulates each prologue in a hash keyed by routine name, but appends
+rather than assigns, so a name that appears twice in the input is written out
+twice.
+`astprep` keeps one prologue per name.
+This is the only difference between `astprep` and `getatt` output for the AST
+sources, once the quoting bug above is allowed for.
+
 ## Development
 
 Create the uv environment with the development dependencies and run the

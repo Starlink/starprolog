@@ -172,7 +172,12 @@ class LineBlock(FrozenModel):
 
 
 class ListItem(FrozenModel):
-    """A single hyphen-led list item."""
+    """A single hyphen-led list item.
+
+    The lines are the item's source lines, indented relative to the section
+    body and with the leading hyphen retained, because the traditional
+    renderers place both the hyphen and the continuation lines by column.
+    """
 
     lines: tuple[str, ...]
     source: SourceSpan
@@ -197,6 +202,15 @@ class Section(FrozenModel):
     source: SourceSpan
     blocks: tuple[Block, ...] = ()
     subsections: tuple[Section, ...] = ()
+    title_indent: int = Field(default=0, ge=0)
+    """Indentation of this section's title relative to the enclosing body."""
+
+    body_indent: int = Field(default=0, ge=0)
+    """Indentation of this section's body relative to its own title.
+
+    Renderers that reproduce the source layout rather than imposing their own
+    need these offsets; those that normalize the layout can ignore them.
+    """
 
     @property
     def has_content(self) -> bool:
@@ -208,6 +222,49 @@ class Section(FrozenModel):
             `True` when the section contains parsed content.
         """
         return bool(self.blocks or self.subsections)
+
+    def body_lines(self) -> list[str]:
+        """Rebuild the section body as the lines the renderers format.
+
+        Blank lines are restored wherever the source had them, preserved
+        blocks regain their ``---`` markers, and every line keeps its
+        indentation relative to the body. This is the input both
+        ``SST_LATP`` and ``SST_PUTP`` work from.
+
+        Returns
+        -------
+        lines : `list` [`str`]
+            Body lines, indented relative to the shallowest body line.
+        """
+        lines: list[str] = []
+        previous_end: int | None = None
+
+        def separate(start_line: int) -> None:
+            if previous_end is not None and start_line - previous_end > 1:
+                lines.append("")
+
+        for block in self.blocks:
+            separate(block.source.start_line)
+            if isinstance(block, ParagraphBlock):
+                lines.extend(block.lines)
+            elif isinstance(block, LineBlock):
+                marker = f"{' ' * block.marker_indent}---"
+                lines.extend((marker, *block.lines, marker))
+            else:
+                for item in block.items:
+                    separate(item.source.start_line)
+                    lines.extend(item.lines)
+                    previous_end = item.source.end_line
+            previous_end = block.source.end_line
+
+        for subsection in self.subsections:
+            separate(subsection.source.start_line)
+            title_offset = " " * subsection.title_indent
+            body_offset = " " * (subsection.title_indent + subsection.body_indent)
+            lines.append(f"{title_offset}{subsection.title}")
+            lines.extend(f"{body_offset}{x}" if x else "" for x in subsection.body_lines())
+            previous_end = subsection.source.end_line
+        return lines
 
     def plain_text(self) -> str:
         """Flatten the section content into unescaped plain text.
