@@ -119,6 +119,16 @@ for a subroutine and an assignment for a function, following the forms
 A main program gets neither, since it is not invoked.
 `Result:` becomes `Returned Value`; every other heading keeps its own name.
 
+`Given:`, `Returned:` and `Given and returned:` merge into a single
+`Arguments:` section. Their entries are columnar, `NAME  type  description`,
+with the access mode carried by the heading rather than by the entry, so each
+becomes a `NAME = type (Given)` subsection with the description as its body,
+and the mode moves onto the entry. A line indented past its entry continues
+that entry's description; a line returning to the heading column ends the
+list. Of the 1037 argument entries in the Starlink tree, 23 do not follow the
+columnar convention closely enough to be split, and are left as they were
+written.
+
 ### Known gaps
 
 **Help output is not available.** These prologues have no `Description:`
@@ -126,23 +136,23 @@ section, and `prohlp` treats one as mandatory, so `starprolog hlp` rejects
 all 313 of them. Only the LaTeX renderer is useful for this format at
 present, and it accepts 311.
 
-**Argument lists are not converted, and reflow.** `Given:`, `Returned:` and
-`Given and returned:` are left as ordinary topics rather than folded into an
-`Arguments:` section, so their columns run together when LaTeX sets them as a
-paragraph. The conversion looks tractable: the bodies are
-`NAME  type  description`, and splitting on runs of two or more spaces yields
-three fields for 797 of the 809 argument lines in SLALIB, the rest separating
-the name from the type with a single space. Each entry would become a
-`NAME = type (Given)` subsection with the description as its body, and a
-continuation line, indented past its entry, would join that description.
-This is deferred rather than ruled out.
+**Some argument entries cannot be split.** The name and type are usually set
+off from the description by a run of spaces, but 23 entries separate every
+field with a single space, use a notation of their own such as `(input)`, or
+give no type at all. These are kept verbatim rather than guessed at, and reach
+the output as entries with no description.
 
-**Author and copyright lines are dropped.** They are unlabelled free text at
-the same indentation as the headings, so each is recorded as a topic of its
-own rather than as an `Authors:` or `Copyright:` section. Having no body, the
-renderers then drop them, exactly as `prolat` drops any section with no
-content. Recognizing them means matching their shape, which is why it has not
-been done.
+**A qualifier on an argument heading loses its group.** `Given:  (all
+B1950.0,FK4)` qualifies the list that follows it, but once the lists merge
+there is no group left for it to qualify, so it is kept as an entry of its own
+in the position where it appeared.
+
+**Unlabelled prose is dropped.** The author, date and copyright lines, and
+statements such as `The result is an estimate of the air mass`, are free text
+at the same indentation as the headings. Each line is therefore recorded as a
+topic of its own, and having no body the renderers drop it, exactly as
+`prolat` drops any section with no content. Telling this prose from a heading
+means matching its shape, which is why it has not been done.
 
 **A purpose can be mistaken for a heading.** A purpose line that ends in a
 colon and introduces an indented list is structurally indistinguishable from

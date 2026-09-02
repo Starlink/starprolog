@@ -37,6 +37,15 @@ _BANNER_SEARCH = 4
 
 _TITLE_ALIASES = {"result": "Returned Value"}
 
+_ARGUMENT_MODES = {
+    "given": "Given",
+    "returned": "Returned",
+    "given and returned": "Given and Returned",
+}
+"""Headings that list arguments, and the access mode each one implies."""
+
+_FIELDS_RE = re.compile(r"\s{2,}")
+
 
 def extract_slalib_prologues(
     text: str,
@@ -255,9 +264,11 @@ def _normalize(
     # whichever section happens to precede them.
     level = min((_content_indent(lines[index]) for index in headings), default=3)
 
+    arguments, consumed = _arguments(lines, span, headings, level)
     purpose: list[LocatedLine] = []
     body: list[LocatedLine] = []
     in_body = False
+    written_arguments = False
 
     for index in span:
         line = lines[index]
@@ -269,8 +280,16 @@ def _normalize(
         if heading is not None:
             in_body = True
             title = " ".join(heading.group("title").split())
-            title = _TITLE_ALIASES.get(title.casefold(), title)
             column = " " * _content_indent(line)
+            if title.casefold() in _ARGUMENT_MODES:
+                # Every argument heading contributes to one Arguments section,
+                # emitted where the first of them appeared.
+                if not written_arguments:
+                    written_arguments = True
+                    body.append(LocatedLine(number=index + 1, text=f"{column}Arguments:"))
+                    body.extend(arguments)
+                continue
+            title = _TITLE_ALIASES.get(title.casefold(), title)
             body.append(LocatedLine(number=index + 1, text=f"{column}{title}:"))
             groups = heading.groupdict()
             if "value" in groups:
@@ -282,6 +301,8 @@ def _normalize(
                         text=f"{column}   {groups['value'].strip()}",
                     )
                 )
+            continue
+        if index in consumed:
             continue
         content = f" {line[1:]}".rstrip()
         target = body if in_body else purpose
@@ -310,6 +331,119 @@ def _normalize(
         )
     normalized.extend(body)
     return normalized
+
+
+def _entry(text: str) -> tuple[str, str, str] | None:
+    """Split one argument line into its name, type and description.
+
+    Parameters
+    ----------
+    text
+        The argument line, stripped of leading and trailing space.
+
+    Returns
+    -------
+    entry : `tuple` [`str`, `str`, `str`] or `None`
+        Name, type and description, or `None` when the line does not read as
+        an argument at all. The description is set off by a run of spaces;
+        the name and type are usually too, but not always.
+    """
+    fields = _FIELDS_RE.split(text, maxsplit=2)
+    if len(fields) >= 3 and " " not in fields[1]:
+        return fields[0], fields[1], fields[2]
+    if len(fields) == 2 and " " in fields[0]:
+        name, kind = fields[0].split(None, 1)
+        return name, kind, fields[1]
+    if len(fields) == 2 and " " not in fields[1]:
+        return fields[0], fields[1], ""
+    return None
+
+
+def _arguments(
+    lines: list[str],
+    span: range,
+    headings: dict[int, re.Match[str]],
+    level: int,
+) -> tuple[list[LocatedLine], set[int]]:
+    """Rewrite the argument lists as the subsections the renderers expect.
+
+    ``Given:``, ``Returned:`` and ``Given and returned:`` are columnar lists of
+    ``NAME  type  description`` rather than the ``NAME = TYPE (Given)`` form
+    used elsewhere, and the access mode belongs to the heading rather than to
+    the entry. They become one ``Arguments:`` section whose entries each carry
+    their own mode.
+
+    Parameters
+    ----------
+    lines
+        Complete source lines.
+    span
+        Range of line indices covered by the prologue body.
+    headings
+        Section headings found in that range, keyed by line index.
+    level
+        Column at which section headings are written.
+
+    Returns
+    -------
+    lines : `list` [`LocatedLine`]
+        Subsection headers and bodies for the merged section.
+    consumed : `set` [`int`]
+        Indices of the source lines the merged section accounts for.
+    """
+    output: list[LocatedLine] = []
+    consumed: set[int] = set()
+    mode: str | None = None
+    heading_indent = 0
+    entry_indent: int | None = None
+
+    for index in span:
+        line = lines[index]
+        if _END_RE.fullmatch(line) or _START_RE.fullmatch(line):
+            break
+        if not line[:1] or line[0] not in "*Cc#":
+            continue
+        heading = headings.get(index)
+        if heading is not None:
+            title = " ".join(heading.group("title").split())
+            mode = _ARGUMENT_MODES.get(title.casefold())
+            heading_indent = _content_indent(line)
+            entry_indent = None
+            value = heading.groupdict().get("value", "").strip()
+            if mode is not None and value:
+                # A qualifier such as "Given:  (all B1950.0,FK4)" applies to
+                # the whole list rather than to any one argument.
+                output.append(LocatedLine(number=index + 1, text=f"{' ' * (level + 3)}{value}"))
+            continue
+        if mode is None or not line[1:].strip():
+            continue
+
+        indent = _content_indent(line)
+        if indent <= heading_indent:
+            # Prose that returns to the heading column, such as the result
+            # statement, is not part of the argument list.
+            mode = None
+            continue
+
+        consumed.add(index)
+        text = line[1:].strip()
+        if entry_indent is None:
+            entry_indent = indent
+        if indent > entry_indent:
+            # A continuation is aligned under the description column of the
+            # whole table, which means nothing once each entry stands alone.
+            output.append(LocatedLine(number=index + 1, text=f"{' ' * (level + 6)}{text}"))
+            continue
+
+        entry = _entry(text)
+        if entry is None:
+            output.append(LocatedLine(number=index + 1, text=f"{' ' * (level + 3)}{text}"))
+            continue
+        name, kind, description = entry
+        output.append(LocatedLine(number=index + 1, text=f"{' ' * (level + 3)}{name} = {kind} ({mode})"))
+        if description:
+            output.append(LocatedLine(number=index + 1, text=f"{' ' * (level + 6)}{description}"))
+    return output, consumed
 
 
 def _heading(lines: list[str], index: int) -> re.Match[str] | None:
